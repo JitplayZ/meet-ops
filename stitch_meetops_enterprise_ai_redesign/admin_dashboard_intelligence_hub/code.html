@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MeetOps - Admin Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700&amp;family=Inter:wght@400&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-high": "#292a2b",
+                    "on-secondary-container": "#00344e",
+                    "background": "#121315",
+                    "on-surface-variant": "#cbc3d7",
+                    "secondary-container": "#00a2e6",
+                    "on-secondary-fixed-variant": "#004c6e",
+                    "surface": "#121315",
+                    "on-error-container": "#ffdad6",
+                    "secondary": "#89ceff",
+                    "on-tertiary": "#482900",
+                    "secondary-fixed": "#c9e6ff",
+                    "surface-dark": "#0B0C0E",
+                    "surface-bright": "#38393a",
+                    "primary-fixed": "#e9ddff",
+                    "on-primary-fixed": "#23005c",
+                    "on-secondary": "#00344d",
+                    "surface-container-highest": "#343536",
+                    "surface-container-low": "#1b1c1d",
+                    "on-tertiary-container": "#3f2300",
+                    "on-tertiary-fixed-variant": "#673d00",
+                    "tertiary-fixed": "#ffdcbb",
+                    "surface-container-lowest": "#0d0e0f",
+                    "on-tertiary-fixed": "#2c1700",
+                    "on-error": "#690005",
+                    "on-secondary-fixed": "#001e2f",
+                    "surface-variant": "#343536",
+                    "tertiary-container": "#ca801e",
+                    "surface-tint": "#d0bcff",
+                    "on-surface": "#e3e2e3",
+                    "primary-container": "#a078ff",
+                    "outline-variant": "#494454",
+                    "surface-dim": "#121315",
+                    "inverse-on-surface": "#303032",
+                    "border-subtle": "rgba(255, 255, 255, 0.08)",
+                    "on-primary": "#3c0091",
+                    "on-primary-container": "#340080",
+                    "inverse-surface": "#e3e2e3",
+                    "secondary-fixed-dim": "#89ceff",
+                    "primary-fixed-dim": "#d0bcff",
+                    "on-background": "#e3e2e3",
+                    "inverse-primary": "#6d3bd7",
+                    "on-primary-fixed-variant": "#5516be",
+                    "surface-container": "#1f2021",
+                    "primary": "#d0bcff",
+                    "tertiary-fixed-dim": "#ffb869",
+                    "error": "#ffb4ab",
+                    "meetops-purple": "#8B5CF6",
+                    "error-container": "#93000a",
+                    "outline": "#958ea0",
+                    "glass-bg": "rgba(11, 12, 14, 0.7)",
+                    "tertiary": "#ffb869"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-desktop": "48px",
+                    "container-max": "1280px",
+                    "gutter": "24px",
+                    "margin-mobile": "16px",
+                    "base": "4px"
+            },
+            "fontFamily": {
+                    "headline-lg-mobile": ["Hanken Grotesk"],
+                    "headline-lg": ["Hanken Grotesk"],
+                    "label-caps": ["JetBrains Mono"],
+                    "body-md": ["Inter"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "body-sm": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "label-caps": ["12px", {"lineHeight": "1.4", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                    "body-sm": ["14px", {"lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+        }
+        /* Custom scrollbar for deep precision aesthetic */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: theme('colors.surface-container-highest'); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: theme('colors.outline-variant'); }
+        
+        .bento-card {
+            background-color: theme('colors.surface-dark');
+            border: 1px solid theme('colors.border-subtle');
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+        }
+        .bento-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%);
+            pointer-events: none;
+        }
+        
+        .sparkline { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: dash 2s ease-out forwards; }
+        @keyframes dash { to { stroke-dashoffset: 0; } }
+        
+        .timeline-block { border-left: 2px solid theme('colors.meetops-purple'); position: relative; }
+        .timeline-block::before {
+            content: ''; position: absolute; left: -5px; top: 0; width: 8px; height: 8px;
+            border-radius: 50%; background: theme('colors.meetops-purple');
+        }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen overflow-hidden">
+<!-- SideNavBar -->
+<nav class="hidden md:flex bg-surface-dark dark:bg-surface-dark fixed h-screen w-60 left-0 top-0 bg-surface-dark border-r border-border-subtle flex flex-col h-full p-gutter z-50">
+<div class="mb-8 flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-meetops-purple/20 flex items-center justify-center text-meetops-purple">
+<span class="material-symbols-outlined">domain</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg font-bold text-on-surface text-[20px] leading-tight">MeetOps</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant opacity-70 text-[10px]">Enterprise Ops</p>
+</div>
+</div>
+<div class="flex-1 space-y-2">
+<a class="flex items-center gap-3 p-3 text-meetops-purple bg-surface-container-highest rounded-lg font-body-sm text-body-sm transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 rounded-lg font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined">meeting_room</span>
+                Rooms
+            </a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 rounded-lg font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined">groups</span>
+                Meetings
+            </a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 rounded-lg font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+                Calendar
+            </a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 rounded-lg font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined">admin_panel_settings</span>
+                Admin Panel
+            </a>
+</div>
+<div class="mt-auto space-y-2 pt-6 border-t border-border-subtle">
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 rounded-lg font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 rounded-lg font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined">help</span>
+                Help
+            </a>
+<button class="w-full mt-4 bg-meetops-purple hover:bg-inverse-primary text-white font-body-sm text-body-sm py-3 rounded-lg transition-colors shadow-[0_4px_14px_rgba(139,92,246,0.3)]">
+                New Meeting
+            </button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col md:ml-60 h-screen overflow-y-auto relative bg-[#08090A]">
+<!-- TopNavBar -->
+<header class="bg-glass-bg dark:bg-glass-bg docked full-width top-0 sticky z-40 backdrop-blur-md border-b border-border-subtle shadow-sm flex justify-between items-center h-16 px-margin-mobile md:px-margin-desktop">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">search</span>
+<input class="bg-transparent border-none text-on-surface font-body-sm text-body-sm focus:ring-0 w-64 placeholder-on-surface-variant/50" placeholder="Search meetings, rooms, users..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-meetops-purple transition-colors p-2 rounded-full hover:bg-surface-container-highest">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<button class="text-on-surface-variant hover:text-meetops-purple transition-colors p-2 rounded-full hover:bg-surface-container-highest relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-border-subtle overflow-hidden ml-2 cursor-pointer">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a corporate user with a neutral background, suitable for a dark-mode enterprise application avatar. Lighting is crisp and modern." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8bpm51P9zfHsa9ZruaTR8tbYX9C13OAGoYwWFUj1CBVKlQNEZoxYAb4jP-UPo0JVp2XbFO2AKmlYBZhCsZ3-W5YUH4fgCVlCOIX3ofosR4cDKQBdPIxFKn5lhDtJgGA9lb_69xJuPdhEEOD9pzEAFs2tm1R58A7kiGM_inxfKE_FieHNoL-bQG6e54vsCepSUpvx3fJQ140o-WgMkaBEgAVFS8XYkFxbkIrko5skq6HdtKSpDt-PiSAPjK_CN3WMyzB1YNi9ec80"/>
+</div>
+</div>
+</header>
+<!-- Dashboard Canvas -->
+<div class="p-margin-mobile md:p-gutter max-w-container-max mx-auto w-full space-y-gutter pb-32">
+<div class="flex justify-between items-end mb-2">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-1">Overview</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Real-time metrics for today, Oct 24.</p>
+</div>
+<div class="hidden sm:flex gap-2">
+<button class="px-4 py-2 rounded-lg border border-border-subtle font-body-sm text-body-sm text-on-surface hover:bg-surface-container-highest transition-colors">Export Report</button>
+</div>
+</div>
+<!-- KPI Cards Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<div class="bento-card p-6 flex flex-col justify-between h-32 group hover:border-meetops-purple/50 transition-colors">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Total Meetings</span>
+<span class="material-symbols-outlined text-meetops-purple text-opacity-80">groups</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold text-on-surface font-headline-lg">142</span>
+<span class="text-xs text-secondary flex items-center"><span class="material-symbols-outlined text-[14px]">arrow_upward</span> 12%</span>
+</div>
+</div>
+<div class="bento-card p-6 flex flex-col justify-between h-32 group hover:border-meetops-purple/50 transition-colors">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Pending Approvals</span>
+<span class="material-symbols-outlined text-tertiary text-opacity-80">pending_actions</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold text-on-surface font-headline-lg">8</span>
+<span class="text-xs text-on-surface-variant">requires attention</span>
+</div>
+</div>
+<div class="bento-card p-6 flex flex-col justify-between h-32 group hover:border-meetops-purple/50 transition-colors">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Available Rooms</span>
+<span class="material-symbols-outlined text-secondary text-opacity-80">sensor_door</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold text-on-surface font-headline-lg">24</span>
+<span class="text-xs text-on-surface-variant">/ 50 total</span>
+</div>
+</div>
+<div class="bento-card p-6 flex flex-col justify-between h-32 group hover:border-meetops-purple/50 transition-colors relative overflow-hidden">
+<div class="flex justify-between items-start z-10 relative">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Utilization Rate</span>
+<span class="material-symbols-outlined text-meetops-purple text-opacity-80">monitoring</span>
+</div>
+<div class="flex items-baseline gap-2 z-10 relative mt-auto">
+<span class="text-3xl font-bold text-on-surface font-headline-lg">78%</span>
+</div>
+<!-- Sparkline -->
+<svg class="absolute bottom-0 left-0 w-full h-16 opacity-30" preserveaspectratio="none" viewbox="0 0 100 30">
+<path class="sparkline" d="M0,30 L10,25 L20,28 L30,15 L40,20 L50,10 L60,18 L70,5 L80,12 L90,2 L100,8" fill="none" stroke="theme('colors.meetops-purple')" stroke-width="2" vector-effect="non-scaling-stroke"></path>
+<path d="M0,30 L10,25 L20,28 L30,15 L40,20 L50,10 L60,18 L70,5 L80,12 L90,2 L100,8 L100,30 L0,30 Z" fill="url(#grad)" opacity="0.5"></path>
+<defs>
+<lineargradient id="grad" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="theme('colors.meetops-purple')" stop-opacity="1"></stop>
+<stop offset="100%" stop-color="theme('colors.meetops-purple')" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+</div>
+<!-- Bento Grid Main Content -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter mt-8">
+<!-- Left Column (Wider) -->
+<div class="lg:col-span-8 flex flex-col gap-gutter">
+<!-- Chart Area -->
+<div class="bento-card p-6 min-h-[300px] flex flex-col">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-body-md text-body-md font-bold text-on-surface">Room Occupancy Insights</h3>
+<select class="bg-surface-container-highest border-none text-body-sm text-on-surface-variant rounded-md py-1 px-2 focus:ring-1 focus:ring-meetops-purple outline-none">
+<option>This Week</option>
+<option>Last Week</option>
+</select>
+</div>
+<div class="flex-1 flex items-end justify-between gap-2 pt-4 relative">
+<!-- Dummy Bar Chart -->
+<div class="absolute w-full h-[1px] bg-border-subtle top-0"></div>
+<div class="absolute w-full h-[1px] bg-border-subtle top-1/2"></div>
+<div class="w-full flex flex-col items-center gap-2 z-10"><div class="w-full bg-meetops-purple/20 rounded-t-sm h-[40%] hover:bg-meetops-purple/40 transition-colors"></div><span class="text-[10px] text-on-surface-variant font-label-caps">MON</span></div>
+<div class="w-full flex flex-col items-center gap-2 z-10"><div class="w-full bg-meetops-purple/80 rounded-t-sm h-[85%] hover:bg-meetops-purple transition-colors"></div><span class="text-[10px] text-on-surface-variant font-label-caps">TUE</span></div>
+<div class="w-full flex flex-col items-center gap-2 z-10"><div class="w-full bg-meetops-purple/60 rounded-t-sm h-[65%] hover:bg-meetops-purple/80 transition-colors"></div><span class="text-[10px] text-on-surface-variant font-label-caps">WED</span></div>
+<div class="w-full flex flex-col items-center gap-2 z-10"><div class="w-full bg-meetops-purple/90 rounded-t-sm h-[90%] hover:bg-meetops-purple transition-colors"></div><span class="text-[10px] text-on-surface-variant font-label-caps">THU</span></div>
+<div class="w-full flex flex-col items-center gap-2 z-10"><div class="w-full bg-meetops-purple/40 rounded-t-sm h-[50%] hover:bg-meetops-purple/60 transition-colors"></div><span class="text-[10px] text-on-surface-variant font-label-caps">FRI</span></div>
+</div>
+</div>
+<!-- Timeline Widget -->
+<div class="bento-card p-6">
+<h3 class="font-body-md text-body-md font-bold text-on-surface mb-6">Meetings Timeline</h3>
+<div class="space-y-6">
+<div class="timeline-block pl-6">
+<div class="flex justify-between items-start mb-1">
+<h4 class="text-on-surface font-body-sm font-bold">Q4 Planning Sync</h4>
+<span class="text-xs text-on-surface-variant font-label-caps bg-surface-container-high px-2 py-1 rounded">10:00 AM - 11:30 AM</span>
+</div>
+<p class="text-xs text-on-surface-variant mb-2">Room: Apollo (12 pax)</p>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full bg-surface-container-high border border-border-subtle z-30"></div>
+<div class="w-6 h-6 rounded-full bg-surface-container-highest border border-border-subtle z-20"></div>
+<div class="w-6 h-6 rounded-full bg-surface-variant border border-border-subtle z-10 flex items-center justify-center text-[8px] text-on-surface font-bold">+4</div>
+</div>
+</div>
+<div class="timeline-block pl-6 border-l-surface-container-high">
+<div class="flex justify-between items-start mb-1">
+<h4 class="text-on-surface font-body-sm font-bold opacity-70">Design Review</h4>
+<span class="text-xs text-on-surface-variant font-label-caps opacity-70">01:00 PM - 02:00 PM</span>
+</div>
+<p class="text-xs text-on-surface-variant opacity-70">Room: Gemini (4 pax)</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column (Narrower) -->
+<div class="lg:col-span-4 flex flex-col gap-gutter">
+<!-- Quick Actions -->
+<div class="bento-card p-4">
+<h3 class="font-body-sm text-body-sm font-bold text-on-surface-variant mb-4 px-2 uppercase tracking-widest text-[10px]">Quick Actions</h3>
+<div class="grid grid-cols-2 gap-2">
+<button class="flex flex-col items-center justify-center gap-2 p-4 bg-surface-container-low hover:bg-surface-container-high rounded-lg border border-border-subtle transition-colors text-on-surface">
+<span class="material-symbols-outlined text-meetops-purple">add_box</span>
+<span class="text-xs font-body-sm">New Meeting</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-2 p-4 bg-surface-container-low hover:bg-surface-container-high rounded-lg border border-border-subtle transition-colors text-on-surface">
+<span class="material-symbols-outlined text-secondary">view_list</span>
+<span class="text-xs font-body-sm">Browse Rooms</span>
+</button>
+<button class="col-span-2 flex items-center justify-center gap-2 p-3 bg-surface-container-low hover:bg-surface-container-high rounded-lg border border-border-subtle transition-colors text-on-surface mt-1">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">settings_suggest</span>
+<span class="text-xs font-body-sm">System Settings</span>
+</button>
+</div>
+</div>
+<!-- Recent Activity Feed -->
+<div class="bento-card p-6 flex-1 flex flex-col">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-body-md text-body-md font-bold text-on-surface">Activity Log</h3>
+<span class="material-symbols-outlined text-on-surface-variant text-sm cursor-pointer">more_horiz</span>
+</div>
+<div class="space-y-4 flex-1 overflow-y-auto pr-2">
+<div class="flex gap-3 items-start group p-2 hover:bg-surface-container-low rounded-lg transition-colors -mx-2">
+<div class="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center text-secondary shrink-0 mt-1">
+<span class="material-symbols-outlined text-sm">event_available</span>
+</div>
+<div>
+<p class="text-sm font-body-sm text-on-surface">Apollo booked by <span class="font-bold">Sarah J.</span></p>
+<p class="text-xs text-on-surface-variant mt-1">2 mins ago</p>
+</div>
+</div>
+<div class="flex gap-3 items-start group p-2 hover:bg-surface-container-low rounded-lg transition-colors -mx-2">
+<div class="w-8 h-8 rounded-full bg-tertiary/10 flex items-center justify-center text-tertiary shrink-0 mt-1">
+<span class="material-symbols-outlined text-sm">warning</span>
+</div>
+<div>
+<p class="text-sm font-body-sm text-on-surface">Screen offline in <span class="font-bold">Nexus Boardroom</span></p>
+<p class="text-xs text-on-surface-variant mt-1">15 mins ago</p>
+</div>
+</div>
+<div class="flex gap-3 items-start group p-2 hover:bg-surface-container-low rounded-lg transition-colors -mx-2">
+<div class="w-8 h-8 rounded-full bg-error/10 flex items-center justify-center text-error shrink-0 mt-1">
+<span class="material-symbols-outlined text-sm">event_busy</span>
+</div>
+<div>
+<p class="text-sm font-body-sm text-on-surface">Meeting cancelled by <span class="font-bold">Admin</span></p>
+<p class="text-xs text-on-surface-variant mt-1">1 hr ago</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating AI Assistant -->
+<div class="fixed bottom-8 right-8 z-50 group">
+<!-- Tooltip -->
+<div class="absolute bottom-full right-0 mb-4 w-48 bg-surface-dark border border-border-subtle p-3 rounded-xl shadow-[0_20px_40px_rgba(0,0,0,0.4)] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none origin-bottom-right scale-95 group-hover:scale-100">
+<p class="text-xs text-on-surface font-body-sm">How can I help you book today?</p>
+<div class="absolute -bottom-2 right-6 w-4 h-4 bg-surface-dark border-b border-r border-border-subtle transform rotate-45"></div>
+</div>
+<!-- FAB -->
+<button class="w-14 h-14 bg-surface-dark border border-meetops-purple/50 rounded-full flex items-center justify-center text-meetops-purple hover:bg-meetops-purple hover:text-white transition-all duration-300 shadow-[0_0_20px_rgba(139,92,246,0.2)] hover:shadow-[0_0_30px_rgba(139,92,246,0.4)] relative overflow-hidden">
+<span class="material-symbols-outlined text-2xl relative z-10">smart_toy</span>
+<div class="absolute inset-0 bg-gradient-to-tr from-meetops-purple/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</button>
+</div>
+</body></html>

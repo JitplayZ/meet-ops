@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MeetOps - Meetings Management</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@100..900&amp;family=Inter:wght@100..900&amp;family=JetBrains+Mono:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-high": "#292a2b",
+                        "on-secondary-container": "#00344e",
+                        "background": "#121315",
+                        "on-surface-variant": "#cbc3d7",
+                        "secondary-container": "#00a2e6",
+                        "on-secondary-fixed-variant": "#004c6e",
+                        "surface": "#121315",
+                        "on-error-container": "#ffdad6",
+                        "secondary": "#89ceff",
+                        "on-tertiary": "#482900",
+                        "secondary-fixed": "#c9e6ff",
+                        "surface-dark": "#0B0C0E",
+                        "surface-bright": "#38393a",
+                        "primary-fixed": "#e9ddff",
+                        "on-primary-fixed": "#23005c",
+                        "on-secondary": "#00344d",
+                        "surface-container-highest": "#343536",
+                        "surface-container-low": "#1b1c1d",
+                        "on-tertiary-container": "#3f2300",
+                        "on-tertiary-fixed-variant": "#673d00",
+                        "tertiary-fixed": "#ffdcbb",
+                        "surface-container-lowest": "#0d0e0f",
+                        "on-tertiary-fixed": "#2c1700",
+                        "on-error": "#690005",
+                        "on-secondary-fixed": "#001e2f",
+                        "surface-variant": "#343536",
+                        "tertiary-container": "#ca801e",
+                        "surface-tint": "#d0bcff",
+                        "on-surface": "#e3e2e3",
+                        "primary-container": "#a078ff",
+                        "outline-variant": "#494454",
+                        "surface-dim": "#121315",
+                        "inverse-on-surface": "#303032",
+                        "border-subtle": "rgba(255, 255, 255, 0.08)",
+                        "on-primary": "#3c0091",
+                        "on-primary-container": "#340080",
+                        "inverse-surface": "#e3e2e3",
+                        "secondary-fixed-dim": "#89ceff",
+                        "primary-fixed-dim": "#d0bcff",
+                        "on-background": "#e3e2e3",
+                        "inverse-primary": "#6d3bd7",
+                        "on-primary-fixed-variant": "#5516be",
+                        "surface-container": "#1f2021",
+                        "primary": "#d0bcff",
+                        "tertiary-fixed-dim": "#ffb869",
+                        "error": "#ffb4ab",
+                        "meetops-purple": "#8B5CF6",
+                        "error-container": "#93000a",
+                        "outline": "#958ea0",
+                        "glass-bg": "rgba(11, 12, 14, 0.7)",
+                        "tertiary": "#ffb869"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-desktop": "48px",
+                        "container-max": "1280px",
+                        "gutter": "24px",
+                        "margin-mobile": "16px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "label-caps": ["12px", { "lineHeight": "1.4", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.02);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: rgba(11, 12, 14, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md text-body-md antialiased overflow-x-hidden selection:bg-meetops-purple/30 selection:text-white">
+<!-- JSON Component: SideNavBar -->
+<nav class="fixed h-screen w-60 left-0 top-0 bg-surface-dark dark:bg-surface-dark border-r border-border-subtle flex flex-col p-gutter z-50">
+<!-- Header -->
+<div class="flex items-center gap-3 mb-8 px-2">
+<div class="w-8 h-8 rounded-lg bg-meetops-purple flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.4)]">
+<span class="material-symbols-outlined text-white text-xl" style="font-variation-settings: 'FILL' 1;">hexagon</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-[20px] font-bold text-on-surface leading-tight tracking-tight">MeetOps</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant text-[10px]">Enterprise Ops</p>
+</div>
+</div>
+<!-- Primary CTA -->
+<button class="w-full bg-meetops-purple text-white font-body-sm text-body-sm font-medium py-2.5 rounded-lg mb-8 hover:bg-meetops-purple/90 transition-colors shadow-[0_4px_12px_rgba(139,92,246,0.25)] flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">add</span>
+            New Meeting
+        </button>
+<!-- Main Navigation -->
+<div class="flex-1 flex flex-col gap-1">
+<!-- Dashboard (Inactive) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-meetops-purple transition-colors">dashboard</span>
+<span class="font-body-sm text-body-sm font-medium">Dashboard</span>
+</a>
+<!-- Rooms (Inactive) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-meetops-purple transition-colors">meeting_room</span>
+<span class="font-body-sm text-body-sm font-medium">Rooms</span>
+</a>
+<!-- Meetings (ACTIVE STATE - based on semantic intent of page) -->
+<a class="flex items-center gap-3 px-3 py-2 text-meetops-purple bg-surface-container-highest rounded-lg transition-colors duration-200 shadow-sm relative" href="#">
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-meetops-purple rounded-r-full"></div>
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">groups</span>
+<span class="font-body-sm text-body-sm font-semibold">Meetings</span>
+</a>
+<!-- Calendar (Inactive) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-meetops-purple transition-colors">calendar_today</span>
+<span class="font-body-sm text-body-sm font-medium">Calendar</span>
+</a>
+<!-- Admin Panel (Inactive) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-meetops-purple transition-colors">admin_panel_settings</span>
+<span class="font-body-sm text-body-sm font-medium">Admin Panel</span>
+</a>
+</div>
+<!-- Footer Navigation -->
+<div class="pt-4 border-t border-border-subtle flex flex-col gap-1 mt-auto">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-meetops-purple transition-colors">settings</span>
+<span class="font-body-sm text-body-sm font-medium">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200 group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-meetops-purple transition-colors">help</span>
+<span class="font-body-sm text-body-sm font-medium">Help</span>
+</a>
+</div>
+</nav>
+<!-- JSON Component: TopNavBar -->
+<header class="docked full-width top-0 sticky z-40 backdrop-blur-md border-b border-border-subtle shadow-sm bg-glass-bg dark:bg-glass-bg flex justify-between items-center h-16 px-margin-desktop ml-60">
+<!-- Search Bar (on_left) -->
+<div class="flex-1 max-w-md">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-meetops-purple transition-colors">search</span>
+<input class="w-full bg-surface-container-low border border-border-subtle rounded-lg py-2 pl-10 pr-4 text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-meetops-purple focus:ring-1 focus:ring-meetops-purple transition-all placeholder:text-on-surface-variant/50" placeholder="Search meetings, rooms, or people..." type="text"/>
+<div class="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+<kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-label-caps bg-surface-variant text-on-surface-variant border border-border-subtle">⌘</kbd>
+<kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-label-caps bg-surface-variant text-on-surface-variant border border-border-subtle">K</kbd>
+</div>
+</div>
+</div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-all active:scale-95">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-all active:scale-95 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border border-surface"></span>
+</button>
+<div class="h-8 w-px bg-border-subtle mx-2"></div>
+<button class="flex items-center gap-2 hover:opacity-80 transition-opacity active:scale-95">
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-border-subtle object-cover" data-alt="A close-up, highly detailed portrait photo of a professional corporate executive in a modern office setting. The lighting is moody and cinematic, complementing a dark mode interface aesthetic. The subject has a confident expression, sharp focus, and the background features subtle, blurred architectural elements hinting at a high-tech corporate environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1mLNy9Jaa7f2NsjeCxfDQYaTQNetY9WP3JUXTA_D__svxbIc-rUR1xRWmOZYvpREcoSI343SPRp6SIbL3VGB9ivWja-U3Tj2-GozwpUYSi9AskWsE7kGi9ILXXa1jpodMFroArb30S7jKk6de3CyaI-1gELKyQ8frTJehQnPTJZO24SAq3pVKclboQowZxpN3TmHIb5iEtSAmnfwRUUrie7q9Dvv4yW-q72MZR2ezbKxLekSgKhfEP7wKy79PWW_hRvB8TikSbNw"/>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">expand_more</span>
+</button>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="ml-60 p-margin-desktop min-h-[calc(100vh-4rem)]">
+<!-- Page Header & Global Actions -->
+<div class="flex justify-between items-end mb-8">
+<div>
+<h2 class="font-headline-lg text-headline-lg font-bold tracking-tight mb-2">Meetings</h2>
+<p class="text-on-surface-variant text-body-md">Manage your organization's schedule, rooms, and approvals.</p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 rounded-lg border border-border-subtle bg-surface-container-low text-on-surface font-body-sm text-body-sm font-medium hover:bg-surface-container-high transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">download</span>
+                    Export
+                </button>
+<button class="px-4 py-2 rounded-lg bg-meetops-purple text-white font-body-sm text-body-sm font-medium hover:bg-meetops-purple/90 transition-colors shadow-[0_4px_12px_rgba(139,92,246,0.2)] flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">add</span>
+                    Schedule
+                </button>
+</div>
+</div>
+<!-- Navigation Tabs & Filters Bar -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-border-subtle mb-6 pb-4 gap-4">
+<!-- Tabs -->
+<div class="flex gap-6">
+<button class="pb-4 -mb-4 border-b-2 border-meetops-purple text-meetops-purple font-body-sm text-body-sm font-semibold transition-colors">
+                    Upcoming (12)
+                </button>
+<button class="pb-4 -mb-4 border-b-2 border-transparent text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm font-medium transition-colors">
+                    Past
+                </button>
+<button class="pb-4 -mb-4 border-b-2 border-transparent text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm font-medium transition-colors flex items-center gap-2">
+                    For Approval
+                    <span class="bg-primary-container text-on-primary-container text-[10px] font-label-caps px-1.5 py-0.5 rounded">3</span>
+</button>
+</div>
+<!-- Contextual Toolbar (Filters) -->
+<div class="flex items-center gap-3">
+<!-- Bulk Actions (Hidden by default, shown when items selected) -->
+<div class="hidden items-center gap-2 mr-4 animate-fade-in" id="bulk-actions">
+<span class="text-body-sm font-medium text-meetops-purple">2 selected</span>
+<button class="px-3 py-1.5 rounded-md border border-error/30 text-error hover:bg-error/10 font-body-sm text-body-sm transition-colors text-xs">
+                        Cancel Selected
+                    </button>
+<div class="w-px h-4 bg-border-subtle mx-1"></div>
+</div>
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm group-focus-within:text-meetops-purple">calendar_today</span>
+<input class="bg-surface-container-low border border-border-subtle rounded-md py-1.5 pl-8 pr-3 text-body-sm text-on-surface focus:border-meetops-purple focus:outline-none cursor-pointer hover:bg-surface-container-high transition-colors w-40" readonly="" type="text" value="Oct 12 - Oct 19"/>
+</div>
+<button class="flex items-center gap-2 px-3 py-1.5 border border-border-subtle rounded-md bg-surface-container-low hover:bg-surface-container-high transition-colors text-on-surface text-body-sm">
+<span class="material-symbols-outlined text-sm text-on-surface-variant">filter_list</span>
+                    Filters
+                </button>
+</div>
+</div>
+<!-- Data Grid (Bento/Glassmorphism Style) -->
+<div class="glass-panel rounded-xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse whitespace-nowrap">
+<!-- Header -->
+<thead>
+<tr class="bg-surface-container-lowest border-b border-border-subtle">
+<th class="px-4 py-3 w-12 text-center">
+<input class="rounded border-outline-variant bg-surface-dark text-meetops-purple focus:ring-meetops-purple/50 focus:ring-offset-surface" type="checkbox"/>
+</th>
+<th class="px-4 py-3 font-label-caps text-label-caps text-on-surface-variant group cursor-pointer hover:text-on-surface transition-colors">
+<div class="flex items-center gap-1">
+                                    Meeting Title
+                                    <span class="material-symbols-outlined text-[14px] opacity-0 group-hover:opacity-100 transition-opacity">arrow_downward</span>
+</div>
+</th>
+<th class="px-4 py-3 font-label-caps text-label-caps text-on-surface-variant">Organizer</th>
+<th class="px-4 py-3 font-label-caps text-label-caps text-on-surface-variant">Room &amp; Location</th>
+<th class="px-4 py-3 font-label-caps text-label-caps text-on-surface-variant group cursor-pointer hover:text-on-surface transition-colors">
+<div class="flex items-center gap-1">
+                                    Date &amp; Time
+                                    <span class="material-symbols-outlined text-[14px] text-meetops-purple">arrow_downward</span>
+</div>
+</th>
+<th class="px-4 py-3 font-label-caps text-label-caps text-on-surface-variant">Status</th>
+<th class="px-4 py-3 w-16"></th>
+</tr>
+</thead>
+<!-- Body -->
+<tbody class="text-body-sm font-body-sm divide-y divide-border-subtle">
+<!-- Row 1: Expandable -->
+<tr class="hover:bg-surface-container-low transition-colors group cursor-pointer" onclick="toggleRow('row-1-details')">
+<td class="px-4 py-4 text-center" onclick="event.stopPropagation()">
+<input class="rounded border-outline-variant bg-surface-dark text-meetops-purple focus:ring-meetops-purple/50 focus:ring-offset-surface" type="checkbox"/>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-md bg-surface-container-highest border border-border-subtle flex items-center justify-center text-on-surface-variant group-hover:bg-meetops-purple/10 group-hover:text-meetops-purple group-hover:border-meetops-purple/30 transition-all">
+<span class="material-symbols-outlined text-[14px] transition-transform duration-200" id="icon-row-1-details">chevron_right</span>
+</div>
+<span class="font-medium text-on-surface">Q3 Product Roadmap Review</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="Sarah Jenkins" class="w-6 h-6 rounded-full object-cover border border-border-subtle" data-alt="A small, circular avatar portrait of a professional woman with a subtle smile. She is wearing a dark blazer. The lighting is optimized for a dark mode interface, with sharp contrast and a clean, unobtrusive background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0K57XTiEbCF-dz7xl_-KsjX-s7wAwR_TxOYEDfLu0L5lY45l-6QzQnLW3gRXqBfPxYRg6LOD1DFneXemb0tyJTTcxO9dEbNiZFCiknqsrrmbcHNuB4bBJbgwdTU64URfJtfmBx3moDzKW6sIsqjkRuTf2NOpWWsckvIczGfjSTaOE-MKOyOYYMzi7v9tKuBwX7yOcJko6fQmpV4aNdNcxF3zIm5CH8GSMpH6B2byLkEPoIaAum_HgRmBjZRE2PCB7K0EQV9nDAKc"/>
+<span class="text-on-surface-variant">Sarah J.</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-1.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">meeting_room</span>
+<span>Boardroom A</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<div class="flex flex-col">
+<span class="text-on-surface font-medium">Today</span>
+<span class="text-on-surface-variant text-xs">10:00 AM - 11:30 AM</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary/10 text-secondary border border-secondary/20">
+                                    Approved
+                                </span>
+</td>
+<td class="px-4 py-4 text-right" onclick="event.stopPropagation()">
+<button class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1 rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 1: Expanded Details (Hidden by default) -->
+<tr class="hidden bg-surface-dark border-b-2 border-meetops-purple/20" id="row-1-details">
+<td class="px-0 py-0" colspan="7">
+<div class="pl-16 pr-8 py-6 flex gap-8">
+<!-- Agenda Column -->
+<div class="flex-1">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">view_list</span>
+                                            Agenda Details
+                                        </h4>
+<ul class="space-y-2 text-body-sm text-on-surface border-l-2 border-border-subtle pl-4 ml-1">
+<li class="relative before:absolute before:-left-[21px] before:top-2 before:w-2 before:h-2 before:bg-surface-container-highest before:border before:border-border-subtle before:rounded-full">10:00 - Introductions &amp; Q2 Recap</li>
+<li class="relative before:absolute before:-left-[21px] before:top-2 before:w-2 before:h-2 before:bg-meetops-purple before:border before:border-meetops-purple/50 before:rounded-full before:shadow-[0_0_8px_rgba(139,92,246,0.5)]">10:15 - Core Feature Proposals (Active)</li>
+<li class="relative before:absolute before:-left-[21px] before:top-2 before:w-2 before:h-2 before:bg-surface-container-highest before:border before:border-border-subtle before:rounded-full text-on-surface-variant">11:00 - Resource Allocation</li>
+</ul>
+</div>
+<!-- Attendees Column -->
+<div class="w-64">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">group</span>
+                                            Attendees (8)
+                                        </h4>
+<div class="flex flex-wrap gap-2">
+<!-- Stacked Avatars -->
+<div class="flex -space-x-2">
+<img alt="Attendee" class="w-8 h-8 rounded-full border-2 border-surface-dark object-cover" data-alt="Small circular avatar portrait, professional context, dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuARFWWPNNpnvhlBIbFz771cEPWJeqdmseKWoQKL_ZFRoKgesvy4uTH-jKLYcCmF-HH-aWFzV4LPv9M7QbFPXepsbkw7RfJ7L8k8-qGlMxrHj4GNPJynzwywxXuA_1CJ0BUyt8Fr67RPVa97jhuWh3rpTwvmNOtk_ulLVxeuduxoZyyoz5CI6QAWsKuhxaWObvpZI0OIEUSM7iEfZiuPWTZyY0l4KoHOO62dc4GfArGW_daKpoDuZIHlIL9CB0UKSOw3J8KwFtaINwg"/>
+<img alt="Attendee" class="w-8 h-8 rounded-full border-2 border-surface-dark object-cover" data-alt="Small circular avatar portrait, professional context, dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1wEK0i7qxhV81bJHX9-NMSbiAv7PR_9tySVtqkPFeEM3_tWaDN2YzMhDW4iPO3jvbRoAKKGvOkDE-NE1Zl_Q29hfgfrK3TGH_CXAD7PV_4CH2Co1af6GW3NgNmWh0PaJNE4cHvvzwPflSmWg-RZr7M0N9u5WNeahzeC56WPBTr8JWv_5v0pG7MqqaS5afJxoSgtdh526SrAFaCh2M2EgHe3WvTcS8wbKLQ61izDfYja9Ko2InWAPHS83SNgbqN_HSw0ltyuxsyUo"/>
+<img alt="Attendee" class="w-8 h-8 rounded-full border-2 border-surface-dark object-cover" data-alt="Small circular avatar portrait, professional context, dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvwhKwYY3y9V4o5z_c3ObmLygrDfOgJrzjfr7s-avMBPdhwXBr1BWTnMG21-dl439b4bW6EAJILH8yS7zFBWu8SwXwGNtJgBPUdnTBweV8GYY9Maervyp8NjEConEk7VmWTVhoLgSsPr0eRmZ9w862FJX0DfnrT6VT7q1lpVMFEshvREkilZhXuAcXBCWh9L2icSJJoMTkjVQC4tvvhIl4ZT2UL7ahmAE2c5yqsgJbB7lNUg0liqcqfT_wAHFEKOoTRkbW4vXXmSI"/>
+<div class="w-8 h-8 rounded-full border-2 border-surface-dark bg-surface-container-high flex items-center justify-center text-xs font-medium text-on-surface-variant">
+                                                    +5
+                                                </div>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-border-subtle">
+<button class="text-meetops-purple hover:text-white transition-colors text-sm font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">edit_document</span>
+                                                Join Meeting Notes
+                                            </button>
+</div>
+</div>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors group cursor-pointer" onclick="toggleRow('row-2-details')">
+<td class="px-4 py-4 text-center" onclick="event.stopPropagation()">
+<input class="rounded border-outline-variant bg-surface-dark text-meetops-purple focus:ring-meetops-purple/50 focus:ring-offset-surface" type="checkbox"/>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-md bg-surface-container-highest border border-border-subtle flex items-center justify-center text-on-surface-variant group-hover:bg-meetops-purple/10 group-hover:text-meetops-purple group-hover:border-meetops-purple/30 transition-all">
+<span class="material-symbols-outlined text-[14px] transition-transform duration-200" id="icon-row-2-details">chevron_right</span>
+</div>
+<span class="font-medium text-on-surface">Design System Sync</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="Marcus T." class="w-6 h-6 rounded-full object-cover border border-border-subtle" data-alt="Small circular avatar portrait of a male designer, glasses, subtle smile, professional context, dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8pgosxqE3AIw011XGZDD77R3ISLMBIIg7AUvdxNiy8IJ8ZipIdRhfQSzMJ1Q6fQ1aqMUhY3VaoyA4k1OAzu9dB4jrXo1zlK1q0ZldJTgmdiBdR1G2_Q8cwhfiDFKA86LvzqsIU7XRBzZLlCp-GhOfknF1Te0OHR8b_RfqBB7T2VC5reqQWDeWxpfAHDqQtQXccJtizSVLiBdbnpJn40KwFoufmYWE2H0Y3nA3XtWesg4P6IJNFfswZzyfKqQl5gpn2pVm-0O_4Sc"/>
+<span class="text-on-surface-variant">Marcus T.</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-1.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">video_camera_front</span>
+<span>Virtual (Zoom)</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<div class="flex flex-col">
+<span class="text-on-surface font-medium">Tomorrow</span>
+<span class="text-on-surface-variant text-xs">2:00 PM - 3:00 PM</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-tertiary/10 text-tertiary border border-tertiary/20">
+                                    Pending Room
+                                </span>
+</td>
+<td class="px-4 py-4 text-right" onclick="event.stopPropagation()">
+<button class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1 rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hidden" id="row-2-details"><td colspan="7"></td></tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors group cursor-pointer" onclick="toggleRow('row-3-details')">
+<td class="px-4 py-4 text-center" onclick="event.stopPropagation()">
+<input class="rounded border-outline-variant bg-surface-dark text-meetops-purple focus:ring-meetops-purple/50 focus:ring-offset-surface" type="checkbox"/>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-md bg-surface-container-highest border border-border-subtle flex items-center justify-center text-on-surface-variant group-hover:bg-meetops-purple/10 group-hover:text-meetops-purple group-hover:border-meetops-purple/30 transition-all">
+<span class="material-symbols-outlined text-[14px] transition-transform duration-200" id="icon-row-3-details">chevron_right</span>
+</div>
+<span class="font-medium text-on-surface">Client Discovery: Acme Corp</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="Elena R." class="w-6 h-6 rounded-full object-cover border border-border-subtle" data-alt="Small circular avatar portrait of a female executive, confident expression, professional context, dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZJ3-SHescIgAjMhYgD8_fvjg46ze3-yYllORZhmO6Jg9HP06nifsQXijWKmePwW-o-iaJbYczAYE70mDt6AUn2RrqSbhprMCoRutyperwxhyJmtLz3nKO-a54so81T4dXLFfF4PHCWHp7OOnIA3vfe26CUna6eHVg2uQmnXjPYMXHgsSUxaEWcbQBMzwQ_FXtGUZyU7zblv4uuF2vVLbfe_fwoKLMynpvy9x1UQ2NivDGgYIGOPsVP3C6ofryi96PIf8gESpro9E"/>
+<span class="text-on-surface-variant">Elena R.</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-1.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">meeting_room</span>
+<span>Executive Suite 1</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<div class="flex flex-col">
+<span class="text-on-surface font-medium">Oct 16, 2023</span>
+<span class="text-on-surface-variant text-xs">9:00 AM - 12:00 PM</span>
+</div>
+</td>
+<td class="px-4 py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-variant text-on-surface-variant border border-border-subtle">
+                                    Completed
+                                </span>
+</td>
+<td class="px-4 py-4 text-right" onclick="event.stopPropagation()">
+<button class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1 rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hidden" id="row-3-details"><td colspan="7"></td></tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer / Pagination -->
+<div class="px-6 py-4 border-t border-border-subtle bg-surface-container-lowest flex items-center justify-between">
+<span class="text-body-sm text-on-surface-variant">Showing 1 to 3 of 12 entries</span>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 rounded flex items-center justify-center border border-border-subtle text-on-surface-variant opacity-50 cursor-not-allowed">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded flex items-center justify-center bg-surface-container-high border border-border-subtle text-on-surface font-medium text-sm">
+                        1
+                    </button>
+<button class="w-8 h-8 rounded flex items-center justify-center hover:bg-surface-container-high border border-transparent text-on-surface-variant transition-colors text-sm">
+                        2
+                    </button>
+<button class="w-8 h-8 rounded flex items-center justify-center border border-border-subtle text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Lightweight interaction script -->
+<script>
+        function toggleRow(rowId) {
+            const row = document.getElementById(rowId);
+            const icon = document.getElementById('icon-' + rowId);
+            
+            if (row.classList.contains('hidden')) {
+                row.classList.remove('hidden');
+                icon.style.transform = 'rotate(90deg)';
+                // Optional: add a subtle highlight to parent row
+                row.previousElementSibling.classList.add('bg-surface-container-low');
+            } else {
+                row.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+                row.previousElementSibling.classList.remove('bg-surface-container-low');
+            }
+        }
+
+        // Mock multi-select behavior
+        const checkboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+        const bulkActions = document.getElementById('bulk-actions');
+        
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                const checkedCount = document.querySelectorAll('tbody input[type="checkbox"]:checked').length;
+                if (checkedCount > 0) {
+                    bulkActions.classList.remove('hidden');
+                    bulkActions.classList.add('flex');
+                    bulkActions.querySelector('span').textContent = `${checkedCount} selected`;
+                } else {
+                    bulkActions.classList.add('hidden');
+                    bulkActions.classList.remove('flex');
+                }
+            });
+        });
+    </script>
+</body></html>

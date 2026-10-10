@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MeetOps - AI-Powered Meeting Operations</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#7C3AED", // Deep purple
+                        "background-light": "#FAFAFA",
+                        "background-dark": "#09090B",
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#18181B",
+                        "border-light": "#E4E4E7",
+                        "border-dark": "#27272A",
+                        "text-light": "#18181B",
+                        "text-dark": "#FAFAFA",
+                        "text-muted-light": "#71717A",
+                        "text-muted-dark": "#A1A1AA",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                        'xl': "1rem",
+                        '2xl': "1.5rem",
+                    },
+                    backgroundImage: {
+                        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+                    }
+                },
+            },
+        };
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .dark .glass-effect {
+            background: rgba(24, 24, 27, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .light .glass-effect {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .gradient-text {
+            background: linear-gradient(to right, #A78BFA, #7C3AED);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .dark .gradient-text {
+            background: linear-gradient(to right, #C4B5FD, #8B5CF6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark antialiased transition-colors duration-300">
+<nav class="fixed w-full z-50 glass-effect border-b border-border-light dark:border-border-dark transition-colors duration-300">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between items-center h-16">
+<div class="flex items-center gap-2">
+<span class="material-icons-outlined text-primary text-2xl">auto_awesome</span>
+<span class="font-bold text-xl tracking-tight">MeetOps</span>
+</div>
+<div class="hidden md:flex items-center space-x-8">
+<a class="text-sm font-medium text-text-muted-light dark:text-text-muted-dark hover:text-text-light dark:hover:text-text-dark transition-colors" href="#features">Features</a>
+<a class="text-sm font-medium text-text-muted-light dark:text-text-muted-dark hover:text-text-light dark:hover:text-text-dark transition-colors" href="#assistant">AI Assistant</a>
+<a class="text-sm font-medium text-text-muted-light dark:text-text-muted-dark hover:text-text-light dark:hover:text-text-dark transition-colors" href="#testimonials">Testimonials</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-border-light dark:hover:bg-border-dark transition-colors" id="theme-toggle">
+<span class="material-icons-outlined text-text-muted-light dark:text-text-muted-dark" id="theme-icon">light_mode</span>
+</button>
+<a class="hidden sm:block text-sm font-medium text-text-light dark:text-text-dark hover:text-primary transition-colors" href="#">Log In</a>
+<a class="bg-primary text-white text-sm font-medium px-4 py-2 rounded-full hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20" href="#">Get Started</a>
+</div>
+</div>
+</div>
+</nav>
+<section class="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+<div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background-light dark:via-background-dark to-background-light dark:to-background-dark -z-10"></div>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border-light dark:border-border-dark bg-surface-light/50 dark:bg-surface-dark/50 backdrop-blur-sm mb-8">
+<span class="flex h-2 w-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-xs font-medium">Introducing AI Meeting Assistant v2.0</span>
+</div>
+<h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 max-w-4xl mx-auto leading-tight">
+                Schedule Rooms. <br/>
+<span class="gradient-text">Eliminate Conflicts.</span>
+</h1>
+<p class="text-lg md:text-xl text-text-muted-light dark:text-text-muted-dark max-w-2xl mx-auto mb-10 leading-relaxed">
+                The centralized operations platform that streamlines meeting schedules, prevents overlap, and gives your team full visibility into room availability with AI-powered assistance.
+            </p>
+<div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-16">
+<a class="w-full sm:w-auto bg-primary text-white text-base font-semibold px-8 py-3.5 rounded-full hover:bg-primary/90 transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-2" href="#">
+                    Start for free
+                    <span class="material-icons-outlined text-sm">arrow_forward</span>
+</a>
+<a class="w-full sm:w-auto bg-surface-light dark:bg-surface-dark text-text-light dark:text-text-dark border border-border-light dark:border-border-dark text-base font-medium px-8 py-3.5 rounded-full hover:bg-border-light dark:hover:bg-border-dark transition-all flex items-center justify-center gap-2" href="#">
+<span class="material-icons-outlined text-sm">play_circle</span>
+                    View Demo
+                </a>
+</div>
+<div class="relative max-w-5xl mx-auto mt-12 rounded-2xl border border-border-light dark:border-border-dark shadow-2xl overflow-hidden bg-surface-light dark:bg-surface-dark transform perspective-1000 rotate-x-2">
+<div class="absolute inset-0 bg-gradient-to-t from-background-light dark:from-background-dark via-transparent to-transparent z-10"></div>
+<img alt="Abstract tech background representing data flow" class="w-full h-auto object-cover opacity-80 dark:opacity-50 mix-blend-overlay" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBT1ay2VyEhyEkgpyE6e9E8M4MYMthg_S3_gqqTsjSBdU96u_vbIkBrJUTsZiJt2tWXH61f6IxqOwhFjzG8QknVsLo9J5Y3sZyORJ4FLmcdbtVnhNNOb5Gb3qlmvnc64Xklvx6_jyw0YB4RMe0p3zHjIvoYW9XWlcd4N3BLT1txLcgsRrfS3PyHSw1IvHkBCOb-DGAvug4yB7QoXduMMOmHcIL9xWKe6CNCHKdoYZvPbNMI_lHdXmalLHXzEgFh7jmNgDAqe2za66k"/>
+<div class="absolute inset-0 z-20 flex items-center justify-center p-8">
+<div class="w-full max-w-3xl bg-surface-light/80 dark:bg-surface-dark/80 backdrop-blur-md border border-border-light dark:border-border-dark rounded-xl shadow-2xl p-6 transform -translate-y-4">
+<div class="flex justify-between items-center mb-6 border-b border-border-light dark:border-border-dark pb-4">
+<h3 class="font-semibold flex items-center gap-2"><span class="material-icons-outlined text-primary text-sm">calendar_today</span> Meeting Calendar</h3>
+<div class="flex gap-2">
+<div class="w-2 h-2 rounded-full bg-red-500"></div>
+<div class="w-2 h-2 rounded-full bg-yellow-500"></div>
+<div class="w-2 h-2 rounded-full bg-green-500"></div>
+</div>
+</div>
+<div class="grid grid-cols-5 gap-4">
+<div class="col-span-1 border-r border-border-light dark:border-border-dark pr-4 space-y-4">
+<div class="h-8 bg-border-light/50 dark:bg-border-dark/50 rounded w-full"></div>
+<div class="h-8 bg-border-light/50 dark:bg-border-dark/50 rounded w-full"></div>
+<div class="h-8 bg-border-light/50 dark:bg-border-dark/50 rounded w-full"></div>
+</div>
+<div class="col-span-4 grid grid-cols-3 gap-2 relative">
+<div class="h-32 bg-border-light/30 dark:bg-border-dark/30 rounded border border-border-light dark:border-border-dark"></div>
+<div class="h-32 bg-border-light/30 dark:bg-border-dark/30 rounded border border-border-light dark:border-border-dark"></div>
+<div class="h-32 bg-border-light/30 dark:bg-border-dark/30 rounded border border-border-light dark:border-border-dark"></div>
+<div class="absolute top-4 left-4 right-1/3 h-12 bg-primary/20 border-l-4 border-primary rounded px-3 py-2 flex items-center backdrop-blur-sm">
+<span class="text-xs font-medium text-primary">Team Sync - Boardroom A</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-10 border-y border-border-light dark:border-border-dark bg-surface-light/50 dark:bg-surface-dark/50">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<p class="text-center text-sm font-medium text-text-muted-light dark:text-text-muted-dark mb-6">TRUSTED BY INNOVATIVE TEAMS WORLDWIDE</p>
+<div class="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
+<div class="flex items-center gap-2 font-bold text-xl"><span class="material-icons-outlined">ac_unit</span> Acme Corp</div>
+<div class="flex items-center gap-2 font-bold text-xl"><span class="material-icons-outlined">eco</span> Globex</div>
+<div class="flex items-center gap-2 font-bold text-xl"><span class="material-icons-outlined">water_drop</span> Soylent</div>
+<div class="flex items-center gap-2 font-bold text-xl"><span class="material-icons-outlined">bolt</span> Initech</div>
+<div class="flex items-center gap-2 font-bold text-xl hidden sm:flex"><span class="material-icons-outlined">architecture</span> Umbrella</div>
+</div>
+</div>
+</section>
+<section class="py-24 bg-background-light dark:bg-background-dark" id="features">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="text-center max-w-3xl mx-auto mb-16">
+<h2 class="text-3xl md:text-4xl font-bold mb-4">Everything You Need</h2>
+<p class="text-lg text-text-muted-light dark:text-text-muted-dark">Powerful tools to manage every aspect of meeting room management, designed for modern operations teams.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark p-8 rounded-2xl hover:border-primary/50 transition-colors group">
+<div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+<span class="material-icons-outlined text-primary">calendar_month</span>
+</div>
+<h3 class="text-xl font-semibold mb-3">Smart Scheduling</h3>
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm leading-relaxed">Schedule meeting rooms with real-time availability and automatic conflict detection algorithms.</p>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark p-8 rounded-2xl hover:border-primary/50 transition-colors group">
+<div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+<span class="material-icons-outlined text-primary">security</span>
+</div>
+<h3 class="text-xl font-semibold mb-3">Approval Workflows</h3>
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm leading-relaxed">Route meeting requests through managers for controlled office space access and priority management.</p>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark p-8 rounded-2xl hover:border-primary/50 transition-colors group">
+<div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+<span class="material-icons-outlined text-primary">analytics</span>
+</div>
+<h3 class="text-xl font-semibold mb-3">Usage Analytics</h3>
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm leading-relaxed">Track room utilization with visual dashboards to optimize your office real estate and resources.</p>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 bg-surface-light dark:bg-surface-dark border-y border-border-light dark:border-border-dark overflow-hidden relative" id="assistant">
+<div class="absolute right-0 top-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl -z-10"></div>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="grid lg:grid-cols-2 gap-16 items-center">
+<div>
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-medium mb-6">
+<span class="material-icons-outlined text-sm">smart_toy</span>
+                        AI-Powered
+                    </div>
+<h2 class="text-3xl md:text-4xl font-bold mb-6">Meet Your New Booking Assistant</h2>
+<p class="text-lg text-text-muted-light dark:text-text-muted-dark mb-8 leading-relaxed">
+                        Stop hunting for available rooms. Just ask the AI Assistant to find a space for your team sync, and it will handle the availability, capacity constraints, and booking instantly.
+                    </p>
+<ul class="space-y-4 mb-8">
+<li class="flex items-start gap-3">
+<span class="material-icons-outlined text-primary mt-1">check_circle</span>
+<span class="text-text-muted-light dark:text-text-muted-dark">Natural language processing for complex booking requests.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-icons-outlined text-primary mt-1">check_circle</span>
+<span class="text-text-muted-light dark:text-text-muted-dark">Context-aware suggestions based on previous meetings.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-icons-outlined text-primary mt-1">check_circle</span>
+<span class="text-text-muted-light dark:text-text-muted-dark">Instant conflict resolution and alternative proposals.</span>
+</li>
+</ul>
+</div>
+<div class="relative">
+<div class="bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[500px]">
+<div class="bg-primary p-4 flex justify-between items-center text-white">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+<span class="material-icons-outlined">smart_toy</span>
+</div>
+<div>
+<div class="font-semibold text-sm">Meeting Assistant</div>
+<div class="text-xs text-white/70">AI-powered booking help</div>
+</div>
+</div>
+</div>
+<div class="flex-1 p-6 space-y-6 overflow-y-auto bg-surface-light/50 dark:bg-surface-dark/50">
+<div class="flex gap-4">
+<div class="w-8 h-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-white mt-1">
+<span class="material-icons-outlined text-sm">smart_toy</span>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl rounded-tl-none p-4 shadow-sm max-w-[85%]">
+<p class="text-sm">👋 Hi! I'm your AI Meeting Booking Assistant. I can help you find rooms, check availability, book meetings, or show your bookings. How can I help you today?</p>
+<span class="text-[10px] text-text-muted-light dark:text-text-muted-dark mt-2 block">12:16 PM</span>
+</div>
+</div>
+<div class="flex gap-4 flex-row-reverse">
+<div class="w-8 h-8 rounded-full bg-border-light dark:bg-border-dark flex-shrink-0 flex items-center justify-center mt-1">
+<span class="material-icons-outlined text-sm">person</span>
+</div>
+<div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-sm max-w-[85%]">
+<p class="text-sm">Find a room for 5 people tomorrow at 2 PM with a whiteboard.</p>
+<span class="text-[10px] text-white/70 mt-2 block text-right">12:18 PM</span>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="w-8 h-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-white mt-1">
+<span class="material-icons-outlined text-sm">smart_toy</span>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl rounded-tl-none p-4 shadow-sm max-w-[85%]">
+<p class="text-sm mb-3">I found 2 available rooms matching your criteria for tomorrow at 2:00 PM:</p>
+<div class="space-y-2 mb-2">
+<div class="border border-border-light dark:border-border-dark rounded-lg p-3 hover:border-primary cursor-pointer transition-colors">
+<div class="flex justify-between items-center mb-1">
+<span class="font-medium text-sm">Focus Room 202</span>
+<span class="text-xs text-primary">Available</span>
+</div>
+<div class="text-xs text-text-muted-light dark:text-text-muted-dark flex gap-2">
+<span>👥 Cap: 8</span>
+<span>• Whiteboard</span>
+</div>
+</div>
+</div>
+<button class="w-full bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium py-2 rounded-lg transition-colors">Book Now</button>
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark">
+<div class="relative">
+<input class="w-full bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-full pl-4 pr-12 py-3 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Ask about meetings, rooms..." type="text"/>
+<button class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-colors">
+<span class="material-icons-outlined text-sm">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-20 bg-primary">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-x divide-white/20">
+<div class="px-4">
+<div class="text-4xl md:text-5xl font-bold text-white mb-2">30%</div>
+<div class="text-white/80 text-sm font-medium">Time saved on scheduling</div>
+</div>
+<div class="px-4">
+<div class="text-4xl md:text-5xl font-bold text-white mb-2">0</div>
+<div class="text-white/80 text-sm font-medium">Double-bookings</div>
+</div>
+<div class="px-4">
+<div class="text-4xl md:text-5xl font-bold text-white mb-2">45%</div>
+<div class="text-white/80 text-sm font-medium">Increased room utilization</div>
+</div>
+<div class="px-4">
+<div class="text-4xl md:text-5xl font-bold text-white mb-2">10k+</div>
+<div class="text-white/80 text-sm font-medium">Meetings managed daily</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 bg-background-light dark:bg-background-dark relative overflow-hidden">
+<div class="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-primary/10 via-background-light dark:via-background-dark to-transparent -z-10"></div>
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+<div class="bg-gradient-to-br from-primary to-purple-800 rounded-3xl p-10 md:p-16 shadow-2xl relative overflow-hidden text-white">
+<div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+<h2 class="text-3xl md:text-4xl font-bold mb-6 relative z-10">Ready to streamline your meetings?</h2>
+<p class="text-lg text-white/80 mb-10 max-w-2xl mx-auto relative z-10">
+                    Start managing your office slots today – free to use, easy to set up. Join thousands of teams already using MeetOps.
+                </p>
+<div class="relative z-10">
+<a class="inline-flex items-center gap-2 bg-white text-primary text-base font-bold px-8 py-4 rounded-full hover:bg-gray-50 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5" href="#">
+                        Get Started Now
+                        <span class="material-icons-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<footer class="bg-surface-light dark:bg-surface-dark border-t border-border-light dark:border-border-dark py-12">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="material-icons-outlined text-primary text-2xl">auto_awesome</span>
+<span class="font-bold text-xl tracking-tight text-text-light dark:text-text-dark">MeetOps</span>
+</div>
+<div class="flex space-x-6">
+<a class="text-text-muted-light dark:text-text-muted-dark hover:text-text-light dark:hover:text-text-dark text-sm transition-colors" href="#">Privacy</a>
+<a class="text-text-muted-light dark:text-text-muted-dark hover:text-text-light dark:hover:text-text-dark text-sm transition-colors" href="#">Terms</a>
+<a class="text-text-muted-light dark:text-text-muted-dark hover:text-text-light dark:hover:text-text-dark text-sm transition-colors" href="#">Contact</a>
+</div>
+</div>
+<div class="mt-8 text-center text-xs text-text-muted-light dark:text-text-muted-dark">
+                © 2026 MeetOps. Built for demonstration purposes.
+            </div>
+</div>
+</footer>
+<script>
+        // Simple theme toggle script
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        const htmlElement = document.documentElement;
+        themeToggleBtn.addEventListener('click', () => {
+            htmlElement.classList.toggle('dark');
+            if (htmlElement.classList.contains('dark')) {
+                themeIcon.textContent = 'light_mode';
+            } else {
+                themeIcon.textContent = 'dark_mode';
+            }
+        });
+    </script>
+
+</body></html>

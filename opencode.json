@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "supabase": {
+      "type": "remote",
+      "url": "https://mcp.supabase.com/mcp?project_ref=vrmesshizcwbygfnnzyo",
+      "enabled": true
+    },
+
+    "testsprite": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "-y",
+        "@testsprite/testsprite-mcp@latest"
+      ],
+      "environment": {
+        "API_KEY": "sk-user-kzfMI79x0EWDF9FLkcF_Odljg57GqrsCC1osjzXybgKyXsiC34uE5jK-vhyb5LRhipjD0OyI4R5i32A_MVVNUiXxcflqjwQu2p83_nIU4KXAHCRAFY5M-mVZ0Qbllb83oJ8"
+      }
+    }
+  }
+}
