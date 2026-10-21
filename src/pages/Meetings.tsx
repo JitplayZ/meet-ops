@@ -73,7 +73,10 @@ export default function Meetings() {
 
   const upcoming = meetings.filter((m) => isAfter(m.endTime, now) && m.status !== 'cancelled');
   const past = meetings.filter((m) => isBefore(m.endTime, now) || m.status === 'cancelled');
-  const displayed = tab === 'upcoming' ? upcoming : past;
+  const hasActiveFilters = Boolean(searchQuery || selectedRoom || selectedDate);
+  // With explicit room/date/search filters, search across the full dataset so a
+  // just-created booking is findable regardless of the upcoming/past tab.
+  const displayed = hasActiveFilters ? meetings : tab === 'upcoming' ? upcoming : past;
 
   const filtered = displayed.filter((m) => {
     const matchesSearch = m.title.toLowerCase().includes(searchQuery.toLowerCase());

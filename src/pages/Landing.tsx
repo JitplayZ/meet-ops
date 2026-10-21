@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import {
   Sparkles,
   Calendar,
@@ -18,6 +18,39 @@ export default function Landing() {
     { role: 'user', text: "Find a room for 5 people tomorrow at 2 PM with a whiteboard." },
     { role: 'assistant', text: "I found 2 available rooms matching your criteria for tomorrow at 2:00 PM: Focus Room 202 (Cap: 8, Whiteboard) and Apollo (Cap: 12, Whiteboard). Would you like to book Focus Room 202?" }
   ]);
+
+  // Interactive demo calendar state
+  const DEMO_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const DEMO_MEETINGS = [
+    { title: 'Board Review', room: 'Boardroom A', type: 'boardroom', floor: 'Executive Wing', day: 'Mon', time: '09:00 - 10:30', status: 'Approved' },
+    { title: 'Team Sync', room: 'Boardroom B', type: 'boardroom', floor: 'HQ - Floor 12', day: 'Mon', time: '11:30 - 13:00', status: 'Approved' },
+    { title: 'Design Huddle', room: 'Huddle 2A', type: 'huddle', floor: 'HQ - Floor 4', day: 'Tue', time: '10:00 - 10:30', status: 'Pending' },
+    { title: '1:1 Check-in', room: 'Huddle 4B', type: 'huddle', floor: 'HQ - Floor 4', day: 'Wed', time: '14:00 - 14:30', status: 'Approved' },
+    { title: 'Sprint Planning', room: 'Boardroom A', type: 'boardroom', floor: 'Executive Wing', day: 'Thu', time: '09:30 - 11:00', status: 'Approved' },
+    { title: 'Standup', room: 'Huddle 2A', type: 'huddle', floor: 'HQ - Floor 4', day: 'Fri', time: '09:00 - 09:15', status: 'Pending' },
+  ];
+  const [demoRoomType, setDemoRoomType] = useState<'all' | 'boardroom' | 'huddle'>('all');
+  const [demoDay, setDemoDay] = useState<string>('');
+
+  const demoFilteredMeetings = DEMO_MEETINGS.filter(
+    m => (demoRoomType === 'all' || m.type === demoRoomType) && (!demoDay || m.day === demoDay),
+  );
+
+  const demoChipStyle = (active: boolean): CSSProperties => ({
+    height: 32,
+    borderRadius: '4px',
+    border: `1px solid ${active ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.08)'}`,
+    background: active ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+    color: active ? 'var(--meetops-purple)' : 'var(--color-on-surface-variant)',
+    fontSize: '11px',
+    fontWeight: active ? 700 : 500,
+    padding: '0 10px',
+    cursor: 'pointer',
+    textAlign: 'left',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'all 0.15s',
+  });
 
   const handleDemoSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,43 +226,100 @@ export default function Landing() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 20 }}>
-              {/* Sidebar filter list mockup */}
-              <div style={{ borderRight: '1px solid var(--color-border-subtle)', paddingRight: 16, display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
-                <div style={{ height: 32, background: 'rgba(255, 255, 255, 0.03)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>HQ - Floor 4</div>
-                <div style={{ height: 32, background: 'rgba(255, 255, 255, 0.03)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Boardroom (10+)</div>
-                <div style={{ height: 32, background: 'rgba(139, 92, 246, 0.08)', borderRadius: '4px', border: '1px solid rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: '11px', color: 'var(--meetops-purple)' }}>Huddle Room (2-4)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: 20 }}>
+              {/* Interactive demo filter panel */}
+              <div style={{ borderRight: '1px solid var(--color-border-subtle)', paddingRight: 16, display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left' }}>
+                <span className="font-label-caps" style={{ fontSize: '9px', color: 'var(--color-outline)', textTransform: 'uppercase', marginBottom: 2 }}>Room Type</span>
+                <button type="button" aria-pressed={demoRoomType === 'all'} style={demoChipStyle(demoRoomType === 'all')} onClick={() => setDemoRoomType('all')}>
+                  All Rooms
+                </button>
+                <button type="button" aria-pressed={demoRoomType === 'boardroom'} style={demoChipStyle(demoRoomType === 'boardroom')} onClick={() => setDemoRoomType('boardroom')}>
+                  Boardroom (10+)
+                </button>
+                <button type="button" aria-pressed={demoRoomType === 'huddle'} style={demoChipStyle(demoRoomType === 'huddle')} onClick={() => setDemoRoomType('huddle')}>
+                  Huddle Room (2-4)
+                </button>
+                <span className="font-label-caps" style={{ fontSize: '9px', color: 'var(--color-outline)', textTransform: 'uppercase', margin: '10px 0 2px' }}>Day</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  {DEMO_DAYS.map(d => (
+                    <button
+                      key={d}
+                      type="button"
+                      aria-pressed={demoDay === d}
+                      title={d}
+                      style={{ ...demoChipStyle(demoDay === d), padding: 0, justifyContent: 'center', textAlign: 'center' }}
+                      onClick={() => setDemoDay(prev => (prev === d ? '' : d))}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                {(demoRoomType !== 'all' || demoDay) && (
+                  <button
+                    type="button"
+                    style={{ ...demoChipStyle(false), color: 'var(--meetops-purple)', marginTop: 6, justifyContent: 'center' }}
+                    onClick={() => { setDemoRoomType('all'); setDemoDay(''); }}
+                  >
+                    Reset filters
+                  </button>
+                )}
               </div>
 
-              {/* Grid content mock */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, minHeight: 180, position: 'relative' }}>
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.05)', borderRadius: '8px' }} />
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.05)', borderRadius: '8px' }} />
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.05)', borderRadius: '8px' }} />
-                
-                {/* Event overlay card mock */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 24,
-                    left: 24,
-                    right: 48,
-                    height: 80,
-                    background: 'rgba(139, 92, 246, 0.15)',
-                    borderLeft: '4px solid var(--meetops-purple)',
-                    borderRadius: '0 8px 8px 0',
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    backdropFilter: 'blur(8px)',
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-on-surface)' }}>Team Sync - Boardroom A</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-on-surface-variant)', marginTop: 4 }}>11:30 AM - 1:00 PM · Approved</span>
+              {/* Demo meetings list, driven by the filters above */}
+              <div style={{ minHeight: 200, position: 'relative', textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>
+                    {demoFilteredMeetings.length} meeting{demoFilteredMeetings.length === 1 ? '' : 's'}
+                    {demoRoomType !== 'all' ? ` · ${demoRoomType}` : ' · all rooms'}
+                    {demoDay ? ` · ${demoDay}` : ' · all days'}
+                  </span>
                 </div>
+                {demoFilteredMeetings.length === 0 ? (
+                  <div style={{ border: '1px dashed rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '32px 16px', textAlign: 'center', fontSize: '12px', color: 'var(--color-on-surface-variant)' }}>
+                    No meetings match the selected filters.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {demoFilteredMeetings.map(m => (
+                      <div
+                        key={`${m.title}-${m.day}`}
+                        style={{
+                          background: 'rgba(139, 92, 246, 0.10)',
+                          borderLeft: '4px solid var(--meetops-purple)',
+                          borderRadius: '0 8px 8px 0',
+                          padding: '10px 14px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: 12,
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-on-surface)', display: 'block' }}>
+                            {m.title} - {m.room}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-on-surface-variant)' }}>
+                            {m.day} · {m.time} · {m.floor}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            background: m.status === 'Approved' ? 'rgba(137, 206, 255, 0.12)' : 'rgba(255, 184, 105, 0.15)',
+                            color: m.status === 'Approved' ? 'var(--color-secondary)' : 'var(--color-tertiary)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {m.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

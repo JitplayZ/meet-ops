@@ -27,16 +27,30 @@ export default function ChatBot() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatSessionRef = useRef<ChatSession | null>(null);
+  const sessionPromiseRef = useRef<Promise<ChatSession | null> | null>(null);
 
-  useEffect(() => {
-    if (profile && !chatSessionRef.current) {
-      import('@/services/aiService').then(({ createChatSession }) => {
-        createChatSession(profile.name || 'Guest').then(session => {
+  // Lazily create (or reuse) the Gemini chat session. Never rejects: returns
+  // null when the API key is missing or session creation fails, so the caller
+  // can fall back to the local rule-based assistant.
+  const ensureChatSession = (): Promise<ChatSession | null> => {
+    if (chatSessionRef.current) return Promise.resolve(chatSessionRef.current);
+    if (!sessionPromiseRef.current) {
+      sessionPromiseRef.current = import('@/services/aiService')
+        .then(({ createChatSession }) => createChatSession(profile?.name || 'Guest'))
+        .then(session => {
           chatSessionRef.current = session;
+          if (!session) {
+            sessionPromiseRef.current = null; // allow a retry on the next message
+          }
+          return session;
+        })
+        .catch(() => {
+          sessionPromiseRef.current = null;
+          return null;
         });
-      });
     }
-  }, [profile]);
+    return sessionPromiseRef.current;
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -68,42 +82,51 @@ export default function ChatBot() {
     setIsLoading(true);
 
     try {
-      if (!chatSessionRef.current) {
-        throw new Error("Chat session not initialized. API key might be missing.");
-      }
-
-      let response = await chatSessionRef.current.sendMessage(userMessage.content);
-      
+      const session = await ensureChatSession();
       let responseText = '';
-      try {
-        responseText = response.response.text();
-      } catch (e) {
-        // text() can throw if only function calls were returned
-      }
-      
-      let functionCalls = response.response.functionCalls();
 
-      const { handleFunctionCall } = await import('@/services/aiService');
+      if (session) {
+        let response = await session.sendMessage(userMessage.content);
 
-      while (functionCalls && functionCalls.length > 0) {
-        const functionResponses = await Promise.all(
-          functionCalls.map(async (call) => {
-            const result = await handleFunctionCall(call, profile?.uid || '', profile?.name || 'Guest');
-            return {
-              functionResponse: {
-                name: call.name,
-                response: result,
-              },
-            };
-          })
-        );
-        response = await chatSessionRef.current.sendMessage(functionResponses);
         try {
           responseText = response.response.text();
         } catch (e) {
-          // ignore
+          // text() can throw if only function calls were returned
         }
-        functionCalls = response.response.functionCalls();
+
+        let functionCalls = response.response.functionCalls();
+
+        const { handleFunctionCall } = await import('@/services/aiService');
+
+        while (functionCalls && functionCalls.length > 0) {
+          const functionResponses = await Promise.all(
+            functionCalls.map(async (call) => {
+              const result = await handleFunctionCall(call, profile?.uid || '', profile?.name || 'Guest');
+              return {
+                functionResponse: {
+                  name: call.name,
+                  response: result,
+                },
+              };
+            })
+          );
+          response = await session.sendMessage(functionResponses);
+          try {
+            responseText = response.response.text();
+          } catch (e) {
+            // ignore
+          }
+          functionCalls = response.response.functionCalls();
+        }
+      }
+
+      if (!responseText) {
+        // Gemini unavailable (missing/invalid key, network error) or returned
+        // no text: fall back to the local rule-based booking assistant so the
+        // chat flow still works end to end.
+        const { processChatMessage } = await import('@/services/chatbotService');
+        const fallback = await processChatMessage(userMessage.content, profile?.uid, profile?.name);
+        responseText = fallback.response;
       }
 
       const assistantMessage: ChatMessage = {
@@ -115,13 +138,21 @@ export default function ChatBot() {
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (err: any) {
-      const errorMessage: ChatMessage = {
+      let fallbackText: string | null = null;
+      try {
+        const { processChatMessage } = await import('@/services/chatbotService');
+        const fallback = await processChatMessage(userMessage.content, profile?.uid, profile?.name);
+        fallbackText = fallback.response;
+      } catch {
+        // fall through to error message
+      }
+      const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `Sorry, I encountered an error: ${err.message || 'Please try again.'}`,
+        content: fallbackText || `Sorry, I encountered an error: ${err.message || 'Please try again.'}`,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, assistantMessage]);
     } finally {
       setIsLoading(false);
     }

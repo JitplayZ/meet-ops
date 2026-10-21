@@ -36,20 +36,21 @@ export async function createChatSession(
   userName: string
 ): Promise<ChatSession | null> {
   if (!genAI) {
-    console.error('Gemini API key is missing.');
+    console.warn('Gemini API key is missing; chat will use the local fallback assistant.');
     return null;
   }
 
-  const offset = -new Date().getTimezoneOffset();
-  const offsetHours = Math.floor(Math.abs(offset) / 60).toString().padStart(2, '0');
-  const offsetMinutes = (Math.abs(offset) % 60).toString().padStart(2, '0');
-  const offsetString = `${offset >= 0 ? '+' : '-'}${offsetHours}:${offsetMinutes}`;
-  const localTime = new Date().toLocaleString();
+  try {
+    const offset = -new Date().getTimezoneOffset();
+    const offsetHours = Math.floor(Math.abs(offset) / 60).toString().padStart(2, '0');
+    const offsetMinutes = (Math.abs(offset) % 60).toString().padStart(2, '0');
+    const offsetString = `${offset >= 0 ? '+' : '-'}${offsetHours}:${offsetMinutes}`;
+    const localTime = new Date().toLocaleString();
 
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    tools: bookingTools,
-    systemInstruction: `You are an enterprise AI assistant for "MeetOps", a room booking system.
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      tools: bookingTools,
+      systemInstruction: `You are an enterprise AI assistant for "MeetOps", a room booking system.
     Your goal is to help users find and book meeting rooms.
     Be helpful, concise, and professional.
     Current Local Date/Time: ${localTime}
@@ -61,11 +62,15 @@ export async function createChatSession(
     Once you have the room, title, and time, use the "bookRoom" function.
     IMPORTANT TIMEZONE RULE: The user specifies times in their local time zone. When calling "bookRoom", you MUST append the user's Time Zone Offset ("${offsetString}") to the ISO 8601 string instead of "Z". For example, if the user asks for 2 PM on Oct 24, output "2026-10-24T14:00:00${offsetString}". DO NOT use "Z".
     `,
-  });
+    });
 
-  return model.startChat({
-    history: [],
-  });
+    return model.startChat({
+      history: [],
+    });
+  } catch (err) {
+    console.warn('Failed to create Gemini chat session; chat will use the local fallback assistant.', err);
+    return null;
+  }
 }
 
 export async function handleFunctionCall(

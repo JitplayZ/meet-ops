@@ -2,8 +2,16 @@ import { supabase } from '@/lib/supabase';
 import { format, parse } from 'date-fns';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-2025' });
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+// Guard against a missing key: GoogleGenerativeAI throws on empty/invalid keys,
+// which would break every chat flow. Intent detection falls back to rules
+// when the model is unavailable.
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+const model = genAI
+  ? genAI.getGenerativeModel({
+      model: import.meta.env.VITE_GEMINI_CHAT_MODEL || 'gemini-2.5-flash',
+    })
+  : null;
 
 export interface ChatMessage {
   id: string;
@@ -407,6 +415,7 @@ export async function processChatMessage(
   let intent: BookingIntent;
   
   try {
+    if (!model) throw new Error('Gemini model not configured');
     const geminiResponse = await model.generateContent(
       `You are an AI Meeting Booking Assistant for MeetOps. Help users find rooms, check availability, book meetings, and view their bookings.
       

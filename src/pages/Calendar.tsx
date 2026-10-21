@@ -31,7 +31,14 @@ export default function CalendarPage() {
 
   // Filter checkboxes
   const [selectedRoomTypes, setSelectedRoomTypes] = useState<string[]>(['boardroom', 'huddle']);
-  const [selectedFloor, setSelectedFloor] = useState('HQ - Floor 4');
+  const [selectedFloor, setSelectedFloor] = useState('All Floors');
+  const [selectedDate, setSelectedDate] = useState('');
+
+  const FLOOR_MATCHERS: Record<string, (room: Room) => boolean> = {
+    'HQ - Floor 4': r => /floor\s*4|4th\s*floor/i.test(r.location || ''),
+    'HQ - Floor 12': r => /floor\s*12|12th\s*floor/i.test(r.location || ''),
+    'Executive Wing': r => /executive/i.test(r.location || '') || /executive|boardroom/i.test(r.name || ''),
+  };
 
   useEffect(() => {
     Promise.all([getMeetings(), getRooms()])
@@ -73,13 +80,40 @@ export default function CalendarPage() {
     );
   };
 
+  const roomById = new Map(rooms.map(r => [r.id, r]));
+
+  const matchesFilters = (m: Meeting) => {
+    const room = roomById.get(m.roomId);
+    // Room type filter: boardroom = capacity 10+, huddle = capacity 2-9
+    if (selectedRoomTypes.length > 0) {
+      const capacity = room?.capacity ?? 0;
+      const isBoardroom = capacity >= 10;
+      const isHuddle = capacity >= 2 && capacity < 10;
+      const typeMatch =
+        (selectedRoomTypes.includes('boardroom') && isBoardroom) ||
+        (selectedRoomTypes.includes('huddle') && isHuddle);
+      if (!typeMatch) return false;
+    }
+    // Floor filter
+    if (selectedFloor !== 'All Floors' && room) {
+      const matcher = FLOOR_MATCHERS[selectedFloor];
+      if (matcher && !matcher(room)) return false;
+    }
+    // Date filter (compare in local time)
+    if (selectedDate) {
+      const localDay = `${m.startTime.getFullYear()}-${String(m.startTime.getMonth() + 1).padStart(2, '0')}-${String(m.startTime.getDate()).padStart(2, '0')}`;
+      if (localDay !== selectedDate) return false;
+    }
+    return true;
+  };
+
   // Find meetings that occur in the weekly grid slots (Mon-Fri, between 9am and 5pm)
   const getWeeklyMeetings = () => {
     return meetings.filter(m => {
       if (m.status === 'cancelled' || m.status === 'declined') return false;
       const isMonToFri = m.startTime.getDay() >= 1 && m.startTime.getDay() <= 5;
       const isCorrectWeek = m.startTime >= weekStart && m.startTime <= addDays(weekStart, 5);
-      return isMonToFri && isCorrectWeek;
+      return isMonToFri && isCorrectWeek && matchesFilters(m);
     });
   };
 
@@ -124,6 +158,7 @@ export default function CalendarPage() {
                   height: 36,
                 }}
               >
+                <option>All Floors</option>
                 <option>HQ - Floor 4</option>
                 <option>HQ - Floor 12</option>
                 <option>Executive Wing</option>
@@ -237,10 +272,41 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', background: 'var(--color-surface-container-low)', padding: 4, borderRadius: '8px', border: '1px solid var(--color-border-subtle)' }}>
-            <button className="btn btn-ghost btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Day</button>
-            <button className="btn btn-secondary btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface)', background: 'var(--color-surface-container-highest)', border: 'none', boxShadow: 'none' }}>Week</button>
-            <button className="btn btn-ghost btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Month</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Date filter: restricts the grid to a single day */}
+            <input
+              type="date"
+              aria-label="Filter by date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="input"
+              style={{
+                background: 'var(--color-surface-container-low)',
+                border: '1px solid var(--color-border-subtle)',
+                color: 'var(--color-on-surface)',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                height: 32,
+                width: 140,
+              }}
+            />
+            {selectedDate && (
+              <button
+                onClick={() => setSelectedDate('')}
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: '11px', color: 'var(--color-on-surface-variant)', padding: '4px 8px' }}
+              >
+                Clear date
+              </button>
+            )}
+            <span style={{ fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>
+              {weeklyMeetings.length} meeting{weeklyMeetings.length === 1 ? '' : 's'} shown
+            </span>
+            <div style={{ display: 'flex', background: 'var(--color-surface-container-low)', padding: 4, borderRadius: '8px', border: '1px solid var(--color-border-subtle)' }}>
+              <button className="btn btn-ghost btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Day</button>
+              <button className="btn btn-secondary btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface)', background: 'var(--color-surface-container-highest)', border: 'none', boxShadow: 'none' }}>Week</button>
+              <button className="btn btn-ghost btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Month</button>
+            </div>
           </div>
         </div>
 

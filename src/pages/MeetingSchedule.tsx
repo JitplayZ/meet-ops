@@ -41,6 +41,11 @@ export default function MeetingSchedule() {
     const startDate = new Date(`${dummyDate}T${startTime}`);
     const endDate = new Date(`${dummyDate}T${endTime}`);
 
+    if (!title.trim()) {
+      setError('Please enter a meeting title.');
+      return;
+    }
+
     if (startTime && endTime && endDate <= startDate) {
       setError('End time must be after start time.');
       return;
@@ -48,6 +53,14 @@ export default function MeetingSchedule() {
 
     if (!profile || !roomId || !date) {
       setError('Please fill in all required fields.');
+      return;
+    }
+
+    // Reject past dates up-front: bookings for elapsed time never show in
+    // Upcoming lists or the current calendar week, which reads as "lost" data.
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (date < todayStr) {
+      setError('Meeting date cannot be in the past. Please pick today or a future date.');
       return;
     }
 

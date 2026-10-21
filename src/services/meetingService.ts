@@ -62,12 +62,46 @@ export function hasConflict(
   });
 }
 
+// Find the earliest slot of the same duration, from requestedStart onward, in
+// which the room has no conflicting active meeting. Steps in 30-minute
+// increments up to 3 days out.
+export function findNextFreeSlot(
+  existingMeetings: Meeting[],
+  requestedStart: Date,
+  requestedEnd: Date,
+): { start: Date; end: Date } | null {
+  const durationMs = requestedEnd.getTime() - requestedStart.getTime();
+  if (!(durationMs > 0)) return null;
+  const limit = requestedStart.getTime() + 3 * 24 * 60 * 60 * 1000;
+  const busy = existingMeetings.filter(
+    (m) => m.status !== 'cancelled' && m.status !== 'declined',
+  );
+
+  let candidate = new Date(requestedStart);
+  for (let i = 0; i < 100 && candidate.getTime() < limit; i++) {
+    const candidateEnd = new Date(candidate.getTime() + durationMs);
+    const clash = busy.find((m) => candidate < m.endTime && candidateEnd > m.startTime);
+    if (!clash) return { start: candidate, end: candidateEnd };
+    // Jump just past the conflicting meeting, aligned to the next 30-min mark
+    candidate = new Date(clash.endTime);
+    candidate.setMinutes(candidate.getMinutes() % 30 === 0 ? candidate.getMinutes() : 30 - (candidate.getMinutes() % 30) + candidate.getMinutes(), 0, 0);
+  }
+  return null;
+}
+
 export async function createMeeting(
   data: Omit<Meeting, 'id' | 'createdAt' | 'status'>,
 ): Promise<string> {
   const existing = await getRoomMeetings(data.roomId);
   if (hasConflict(existing, data.startTime, data.endTime)) {
-    throw new Error('This room is already booked during this time.');
+    const suggestion = findNextFreeSlot(existing, data.startTime, data.endTime);
+    const fmt = (d: Date) =>
+      d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    throw new Error(
+      suggestion
+        ? `This room is already booked during this time. Next available slot: ${fmt(suggestion.start)} – ${fmt(suggestion.end)}.`
+        : 'This room is already booked during this time.',
+    );
   }
 
   const payload = {
