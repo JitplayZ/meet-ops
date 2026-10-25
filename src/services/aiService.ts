@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI, SchemaType, ChatSession } from '@google/generative-ai';
 import { supabase } from '@/lib/supabase';
 import { getRooms } from './roomService';
-import { createMeeting } from './meetingService';
+import { createMeeting, getUserMeetings } from './meetingService';
 
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -13,6 +13,10 @@ const bookingTools = [
       {
         name: 'getRooms',
         description: 'Retrieves a list of all available rooms including their IDs, names, capacities, and equipment.',
+      },
+      {
+        name: 'getMyBookings',
+        description: 'Retrieves the current user\'s upcoming and recent meeting bookings. Use this when the user asks to see their bookings, schedule, or reservations.',
       },
       {
         name: 'bookRoom',
@@ -59,8 +63,10 @@ export async function createChatSession(
     Current User: ${userName}
 
     When the user asks for available rooms, always use the "getRooms" function first.
+    When the user asks to see their bookings, upcoming meetings, or schedule, use the "getMyBookings" function.
     When the user wants to book a room, you must collect the exact time, meeting title, and room they want. If they don't provide a specific room, suggest one that fits their needs from the getRooms list.
     Once you have the room, title, and time, use the "bookRoom" function.
+    After booking, call "getMyBookings" to confirm the new reservation is listed.
     IMPORTANT TIMEZONE RULE: The user specifies times in their local time zone. When calling "bookRoom", you MUST append the user's Time Zone Offset ("${offsetString}") to the ISO 8601 string instead of "Z". For example, if the user asks for 2 PM on Oct 24, output "2026-10-24T14:00:00${offsetString}". DO NOT use "Z".
     `,
     });
@@ -90,6 +96,33 @@ export async function handleFunctionCall(
           equipment: r.equipment,
         })),
       };
+    }
+
+    if (call.name === 'getMyBookings') {
+      // Resolve user from session if not passed explicitly
+      let actorId = userId;
+      if (!actorId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        actorId = user?.id || '';
+      }
+      if (!actorId) {
+        return { error: 'No authenticated user. Please sign in first.' };
+      }
+      const userMeetings = await getUserMeetings(actorId);
+      // Only show upcoming + recent (not cancelled/declined)
+      const now = new Date();
+      const relevant = userMeetings
+        .filter(m => m.status !== 'cancelled' && m.status !== 'declined')
+        .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
+        .map(m => ({
+          title: m.title,
+          roomName: m.roomName,
+          startTime: m.startTime.toISOString(),
+          endTime: m.endTime.toISOString(),
+          status: m.status,
+          upcoming: m.endTime > now,
+        }));
+      return { bookings: relevant, count: relevant.length };
     }
 
     if (call.name === 'bookRoom') {
