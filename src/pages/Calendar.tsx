@@ -1,5 +1,6 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getMeetings, cancelMeeting } from '@/services/meetingService';
 import { getRooms } from '@/services/roomService';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
@@ -43,6 +44,12 @@ export default function CalendarPage() {
   // flow) moves the grid to the week containing that date.
   const [currentDate, setCurrentDate] = useState(() => toDateFromInput(urlDate) || new Date());
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  // In-page cancellation flow. The previous native window.confirm() rendered an
+  // OS dialog that lives outside the page DOM (invisible to screenshots/automation
+  // and auto-dismissed in E2E runs), and left no on-page confirmation. These two
+  // pieces of state drive a visible confirm modal and a success notice instead.
+  const [cancelTarget, setCancelTarget] = useState<Meeting | null>(null);
+  const [cancelNotice, setCancelNotice] = useState<string | null>(null);
 
   // Filter checkboxes
   const [selectedRoomTypes, setSelectedRoomTypes] = useState<string[]>(['boardroom', 'huddle']);
@@ -99,8 +106,14 @@ export default function CalendarPage() {
     );
   };
 
-  const handleCancelMeeting = async (meetingId: string) => {
-    if (!confirm('Are you sure you want to cancel this booking?')) return;
+  const handleCancelMeeting = (meeting: Meeting) => {
+    setCancelTarget(meeting);
+  };
+
+  const confirmCancelMeeting = async () => {
+    if (!cancelTarget) return;
+    const meetingId = cancelTarget.id;
+    const meetingTitle = cancelTarget.title;
     try {
       await cancelMeeting(meetingId);
       setMeetings(prev =>
@@ -109,9 +122,12 @@ export default function CalendarPage() {
       if (selectedMeeting?.id === meetingId) {
         setSelectedMeeting(prev => prev ? { ...prev, status: 'cancelled' as const } : null);
       }
+      setCancelNotice(`Booking "${meetingTitle}" was cancelled and removed from the calendar.`);
     } catch (e) {
       console.error(e);
+      setCancelNotice('Failed to cancel the booking. Please try again.');
     }
+    setCancelTarget(null);
   };
 
   const handleRoomTypeToggle = (type: string) => {
@@ -353,6 +369,36 @@ export default function CalendarPage() {
             </div>
           </div>
         </div>
+
+        {/* Cancellation confirmation banner */}
+        {cancelNotice && (
+          <div
+            id="cancel-notice"
+            role="status"
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              margin: '12px 24px 0',
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(137, 206, 255, 0.12)',
+              border: '1px solid var(--color-secondary)',
+              color: 'var(--color-on-surface)',
+              fontSize: '0.8125rem',
+            }}
+          >
+            <span>{cancelNotice}</span>
+            <button
+              onClick={() => setCancelNotice(null)}
+              aria-label="Dismiss cancellation notice"
+              style={{ background: 'transparent', border: 'none', color: 'var(--color-on-surface-variant)', cursor: 'pointer', padding: 2 }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* Calendar Grid wrapper */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
@@ -652,7 +698,7 @@ export default function CalendarPage() {
             <div style={{ marginTop: 'auto', display: 'flex', gap: 8, paddingTop: 16 }}>
               {selectedMeeting.status !== 'cancelled' && (
                 <button
-                  onClick={() => handleCancelMeeting(selectedMeeting.id)}
+                  onClick={() => handleCancelMeeting(selectedMeeting)}
                   className="btn btn-secondary"
                   style={{ flex: 1, borderColor: 'var(--color-error)', color: 'var(--color-error)', fontSize: '0.8125rem', justifyContent: 'center' }}
                 >
@@ -672,6 +718,31 @@ export default function CalendarPage() {
 
       {/* Show the "+ Book" affordance on hour-slot hover */}
       <style>{`button:hover > .slot-plus-hint { opacity: 1 !important; }`}</style>
+
+      {/* Cancel confirmation modal (portal to <body> so it is not affected by
+          the transformed `animate-fade-in` page container). */}
+      {cancelTarget && createPortal(
+        <div className="modal-overlay" onClick={() => setCancelTarget(null)}>
+          <div
+            className="modal-content"
+            role="dialog"
+            aria-modal="true"
+            id="cancel-booking-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ padding: 24, maxWidth: 420 }}
+          >
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: 12 }}>Cancel Booking</h2>
+            <p style={{ fontSize: '0.875rem', color: 'var(--color-on-surface-variant)', marginBottom: 24, lineHeight: 1.5 }}>
+              Are you sure you want to cancel <strong>"{cancelTarget.title}"</strong>? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setCancelTarget(null)}>Keep Booking</button>
+              <button className="btn btn-danger" id="confirm-cancel-btn" onClick={confirmCancelMeeting}>Cancel Booking</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
     </div>
   );
