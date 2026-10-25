@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMeetings, getUserMeetings, cancelMeeting } from '@/services/meetingService';
 import { getRooms } from '@/services/roomService';
@@ -322,8 +323,19 @@ export default function Meetings() {
       {filtered.length === 0 ? (
         <div className="bento-card" style={{ padding: 60, textAlign: 'center' }}>
           <Calendar size={36} style={{ color: 'var(--color-outline)', marginBottom: 12, opacity: 0.5 }} />
-          <p style={{ color: 'var(--color-on-surface-variant)' }}>No {tab} meetings found</p>
-          {tab === 'upcoming' && !searchQuery && !selectedRoom && !selectedDate && (
+          {hasActiveFilters ? (
+            <>
+              <p style={{ color: 'var(--color-on-surface-variant)' }} id="no-filter-matches">
+                No {tab} meetings match your current filters.
+              </p>
+              <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '0.8125rem', marginTop: 6 }}>
+                Try a different room or date, or clear the filters.
+              </p>
+            </>
+          ) : (
+            <p style={{ color: 'var(--color-on-surface-variant)' }}>No {tab} meetings found</p>
+          )}
+          {tab === 'upcoming' && !hasActiveFilters && (
             <Link to="/meetings/new" className="btn btn-primary btn-sm" style={{ marginTop: 16 }}>
               <Plus size={14} /> Schedule a Meeting
             </Link>
@@ -517,8 +529,9 @@ export default function Meetings() {
         </div>
       )}
 
-      {/* Redesigned In-page Cancel Confirmation Modal */}
-      {cancelTarget && (
+      {/* Redesigned In-page Cancel Confirmation Modal — portaled to <body> so the
+          transformed `animate-fade-in` page container does not push it off-screen. */}
+      {cancelTarget && createPortal(
         <div className="modal-overlay" onClick={() => setCancelTarget(null)} style={{ zIndex: 100 }}>
           <div 
             className="modal-content glass-panel" 
@@ -543,7 +556,8 @@ export default function Meetings() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
