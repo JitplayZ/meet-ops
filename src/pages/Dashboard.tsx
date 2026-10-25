@@ -19,14 +19,18 @@ import { format, isAfter, isBefore } from 'date-fns';
 import type { Meeting, Room } from '@/types';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (authLoading) return; // Auth provider still resolving session
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     Promise.all([getUserMeetings(user.id), getRooms()])
       .then(([m, r]) => {
         setMeetings(m);
@@ -34,7 +38,15 @@ export default function Dashboard() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [user]);
+
+    // Refetch when the AI assistant creates a booking so the timeline and
+    // KPI counters reflect the new meeting without requiring a page reload.
+    const handler = () => {
+      getUserMeetings(user.id).then(setMeetings).catch(console.error);
+    };
+    window.addEventListener('meetops:booking-created', handler);
+    return () => window.removeEventListener('meetops:booking-created', handler);
+  }, [user, authLoading]);
 
   const upcoming = meetings.filter(
     (m) => isAfter(m.endTime, new Date()) && m.status !== 'cancelled' && m.status !== 'declined',
