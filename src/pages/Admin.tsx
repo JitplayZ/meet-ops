@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getMeetings, updateMeetingStatus } from '@/services/meetingService';
 import { getRooms } from '@/services/roomService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -111,10 +112,14 @@ export default function Admin() {
           </table>
         </div>
       )}
-      {/* Detail Modal */}
-      {selectedMeeting && (
+      {/* Detail Modal — rendered through a portal to <body>. The page root
+          carries the `animate-fade-in` animation, whose final `transform`
+          makes it the containing block for position:fixed descendants, which
+          previously pushed the centered panel off-screen while only the dark
+          overlay stayed visible. Portaling escapes that ancestor. */}
+      {selectedMeeting && createPortal(
         <div className="modal-overlay" onClick={() => setSelectedMeeting(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ padding: 24 }}>
+          <div className="modal-content" role="dialog" aria-modal="true" id="meeting-details-panel" onClick={(e) => e.stopPropagation()} style={{ padding: 24, width: 480 }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 16 }}>Meeting Details</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div><strong>Organizer:</strong> {selectedMeeting.userName}</div>
@@ -135,7 +140,8 @@ export default function Admin() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
