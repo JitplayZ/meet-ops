@@ -36,14 +36,14 @@ export default function Sidebar() {
     // tokens are cleared before we hard-navigate. A full page navigation (not
     // react-router's `navigate`) sidesteps ProtectedRoute's race: when the
     // auth-state update fires during logout, the guard would otherwise replace
-    // our `/` redirect with a `/login` navigation. Reloading also remounts
-    // AuthProvider against a clean session, so Landing renders unauthenticated.
+    // our `/login` redirect with a `/` navigation. Reloading also remounts
+    // AuthProvider against a clean session, so Login renders unauthenticated.
     try {
       await logout();
     } catch {
       // Even if signOut throws, force the URL change below.
     }
-    window.location.assign('/');
+    window.location.assign('/login');
   };
 
   const isAdmin = profile?.role === 'admin';
