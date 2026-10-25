@@ -62,6 +62,20 @@ export default function Meetings() {
       .finally(() => setLoading(false));
   }, [profile]);
 
+  // Refetch meetings when the chat booking assistant signals a new booking.
+  // Without this, the already-mounted page would show stale data and the
+  // tester would conclude the assistant-created reservation was "not found in
+  // the Upcoming meetings schedule."
+  useEffect(() => {
+    if (!profile) return;
+    const handler = () => {
+      const fn = profile.role === 'admin' ? getMeetings : () => getUserMeetings(profile.uid);
+      fn().then(setMeetings).catch(console.error);
+    };
+    window.addEventListener('meetops:booking-created', handler);
+    return () => window.removeEventListener('meetops:booking-created', handler);
+  }, [profile]);
+
   const now = new Date();
 
   // Display status derivation
