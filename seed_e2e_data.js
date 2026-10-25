@@ -108,6 +108,36 @@ async function ensureProfileRow(userId) {
   }
 }
 
+// Ensure the room inventory satisfies the parameterised filters the E2E suite
+// exercises ("Admin filters rooms by capacity and availability" toggles
+// Instant Bookable + 1-4 People + Floor 4 and expects at least one card).
+// Without a Floor 4 huddle the filter legitimately returns zero rows and the
+// test reads as a UI bug. Idempotent: skips rows that already match by name.
+async function ensureFilterInventoryRooms() {
+  const required = [
+    {
+      name: 'Focus Huddle 402',
+      location: 'HQ - Floor 4',
+      capacity: 4,
+      description: 'Quiet 4-person huddle for quick syncs on Floor 4.',
+      equipment: ['Monitor', 'Whiteboard'],
+      availability_start: '09:00',
+      availability_end: '17:00',
+    },
+  ];
+  const { data: existing } = await supabase.from('rooms').select('id, name');
+  const existingNames = new Set((existing || []).map(r => r.name));
+  for (const room of required) {
+    if (existingNames.has(room.name)) continue;
+    const { error } = await supabase.from('rooms').insert(room);
+    if (error) {
+      console.warn(`  Could not seed room "${room.name}":`, error.message);
+    } else {
+      console.log(`  Seeded room "${room.name}" (${room.location}, ${room.capacity}-cap)`);
+    }
+  }
+}
+
 async function main() {
   console.log('E2E data provisioning');
 
@@ -116,6 +146,7 @@ async function main() {
   const user = await authenticate();
   console.log(`Test account ready: ${EMAIL} / ${PASSWORD} (uid ${user.id})`);
   await ensureProfileRow(user.id);
+  await ensureFilterInventoryRooms();
 
   const { data: upcoming } = await supabase
     .from('meetings')
