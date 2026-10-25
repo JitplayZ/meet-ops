@@ -111,6 +111,8 @@ async function ensureProfileRow(userId) {
 async function main() {
   console.log('E2E data provisioning');
 
+  const REFRESH = process.argv.includes('--refresh');
+
   const user = await authenticate();
   console.log(`Test account ready: ${EMAIL} / ${PASSWORD} (uid ${user.id})`);
   await ensureProfileRow(user.id);
@@ -121,9 +123,23 @@ async function main() {
     .eq('user_id', user.id)
     .in('status', ['pending', 'approved'])
     .gt('end_time', new Date().toISOString());
-  if ((upcoming || []).length > 0) {
-    console.log(`Account already has ${upcoming.length} upcoming meeting(s); skipping seed.`);
+  if ((upcoming || []).length > 0 && !REFRESH) {
+    console.log(`Account already has ${upcoming.length} upcoming meeting(s); skipping seed (use --refresh to rebuild them at timezone-stable midday times).`);
     return;
+  }
+  if ((upcoming || []).length > 0 && REFRESH) {
+    // Clear this test account's own future meetings so they can be recreated at
+    // midday (see the note below). RLS lets the user delete only their own rows.
+    const { error: delErr, count } = await supabase
+      .from('meetings')
+      .delete({ count: 'exact' })
+      .eq('user_id', user.id)
+      .gt('end_time', new Date().toISOString());
+    if (delErr) {
+      console.error('Could not refresh existing upcoming meetings:', delErr.message);
+      return;
+    }
+    console.log(`Refresh: removed ${count ?? upcoming.length} prior upcoming meeting(s).`);
   }
 
   let { data: rooms } = await supabase.from('rooms').select('id, name').order('created_at', { ascending: true });
@@ -142,10 +158,15 @@ async function main() {
   }
 
   console.log('Seeding upcoming meetings for the test account:');
-  await seedUpcomingMeeting(user.id, NAME, rooms[0], 1, 10, 'E2E Upcoming Standup', 'approved');
-  await seedUpcomingMeeting(user.id, NAME, rooms[0], 2, 14, 'E2E Sprint Review', 'pending');
+  // Anchor every booking to local midday. Seeding at an early-morning local hour
+  // can land on the *previous* calendar day once displayed in a browser whose
+  // timezone is behind the seeding machine's, which makes room+date filters
+  // (compared on the displayed local day) miss the meeting. Midday is stable
+  // across the realistic browser timezone range.
+  await seedUpcomingMeeting(user.id, NAME, rooms[0], 1, 12, 'E2E Upcoming Standup', 'approved');
+  await seedUpcomingMeeting(user.id, NAME, rooms[0], 2, 12, 'E2E Sprint Review', 'pending');
   if (rooms[1]) {
-    await seedUpcomingMeeting(user.id, NAME, rooms[1], 3, 9, 'E2E Cross-room Sync', 'approved');
+    await seedUpcomingMeeting(user.id, NAME, rooms[1], 3, 12, 'E2E Cross-room Sync', 'approved');
   }
 
   console.log('Done. The Meetings page "Upcoming" tab and Calendar will now show data for this account.');
