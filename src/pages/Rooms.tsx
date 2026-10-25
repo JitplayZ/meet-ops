@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getRooms, createRoom, updateRoom, deleteRoom } from '@/services/roomService';
+import { getMeetings } from '@/services/meetingService';
 import {
   Plus,
   Edit2,
@@ -15,7 +16,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import type { Room } from '@/types';
+import type { Meeting, Room } from '@/types';
 
 // Mock images to cycle through
 const ROOM_IMAGES = [
@@ -46,13 +47,15 @@ export default function Rooms() {
   const [capacityFilters, setCapacityFilters] = useState<string[]>(['conference']); // default checking 5-10 conference
   const [selectedFloor, setSelectedFloor] = useState('All Floors');
   const [requiredAmenities, setRequiredAmenities] = useState<string[]>([]);
-  const [instantBookable, setInstantBookable] = useState(true);
+  const [instantBookable, setInstantBookable] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
 
   const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
     loadRooms();
+    getMeetings().then(setMeetings).catch(console.error);
   }, []);
 
   async function loadRooms() {
@@ -99,6 +102,7 @@ export default function Rooms() {
       setCapacityFilters([]);
       setSelectedFloor('All Floors');
       setRequiredAmenities([]);
+      setInstantBookable(false);
       setLoading(true);
       await loadRooms();
     } catch (e: any) {
@@ -118,8 +122,29 @@ export default function Rooms() {
     );
   };
 
+  // A room is "instant bookable" when it is free for the next hour — i.e. no
+  // pending/approved meeting overlaps the window [now, now + 1h]. Previously
+  // the toggle was a decorative control (never referenced in the filter
+  // predicate), so switching it had no visible effect on the card list.
+  const busyRoomIds = useMemo(() => {
+    const now = new Date();
+    const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
+    const set = new Set<string>();
+    for (const m of meetings) {
+      if (m.status === 'cancelled' || m.status === 'declined') continue;
+      // Overlap: meeting starts before window-end AND ends after window-start
+      if (m.startTime < inOneHour && m.endTime > now) {
+        set.add(m.roomId);
+      }
+    }
+    return set;
+  }, [meetings]);
+
   // Filter items logic
   const filteredRooms = rooms.filter(room => {
+    // 0. Instant Bookable: when enabled, hide rooms currently occupied
+    if (instantBookable && busyRoomIds.has(room.id)) return false;
+
     // 1. Name search
     const matchesSearch = room.name.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -381,6 +406,7 @@ export default function Rooms() {
                   setCapacityFilters([]);
                   setSelectedFloor('All Floors');
                   setRequiredAmenities([]);
+                  setInstantBookable(false);
                 }}
               >
                 Clear Filters
@@ -398,8 +424,10 @@ export default function Rooms() {
                 // Cycle through mock cover images
                 const coverImage = ROOM_IMAGES[idx % ROOM_IMAGES.length];
                 
-                // Determine mock available status
-                const isAvailable = idx % 2 === 0;
+                // Real availability: room is free when it has no active
+                // booking overlapping the next hour (same logic the
+                // Instant Bookable filter uses).
+                const isAvailable = !busyRoomIds.has(room.id);
 
                 return (
                   <div
