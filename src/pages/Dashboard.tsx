@@ -54,9 +54,9 @@ export default function Dashboard() {
   const pending = meetings.filter((m) => m.status === 'pending');
   const approved = meetings.filter((m) => m.status === 'approved');
 
-  // Display status derivation
+  // Display status derivation — ended meetings always show as completed
   function getDisplayStatus(m: Meeting): string {
-    if (m.status === 'approved' && isBefore(m.endTime, new Date())) {
+    if ((m.status === 'approved' || m.status === 'pending') && isBefore(m.endTime, new Date())) {
       return 'completed';
     }
     return m.status;
