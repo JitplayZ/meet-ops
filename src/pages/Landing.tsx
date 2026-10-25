@@ -167,8 +167,8 @@ export default function Landing() {
             <Link to="/login" style={{ fontSize: '0.875rem', color: 'var(--color-on-surface)', textDecoration: 'none', fontWeight: 500 }} className="btn btn-ghost">
               Log In
             </Link>
-            <Link to="/register" className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: 'var(--radius-full)' }} title="Create a new account – already registered? Use Log In">
-              Get Started (Sign Up)
+            <Link to="/login" className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: 'var(--radius-full)' }} title="Sign in to start booking – new users can create an account from the sign-in page">
+              Get Started
             </Link>
           </div>
         </div>
@@ -235,7 +235,7 @@ export default function Landing() {
           </p>
 
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 60 }}>
-            <Link to="/register" className="btn btn-primary" style={{ padding: '12px 28px', borderRadius: 'var(--radius-full)', fontSize: '0.9375rem' }}>
+            <Link to="/login" className="btn btn-primary" style={{ padding: '12px 28px', borderRadius: 'var(--radius-full)', fontSize: '0.9375rem' }} title="Sign in to start booking – new users can create an account from the sign-in page">
               Start for free <ArrowRight size={16} />
             </Link>
             <a href="#demo" className="btn btn-secondary" style={{ padding: '12px 28px', borderRadius: 'var(--radius-full)', fontSize: '0.9375rem' }}>
@@ -599,7 +599,7 @@ export default function Landing() {
             <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '1.0625rem', maxWidth: 600, margin: '0 auto 36px', lineHeight: 1.6 }}>
               Start managing your office slots today – free to use, easy to set up. Join thousands of teams already using MeetOps.
             </p>
-            <Link to="/register" className="btn btn-secondary" style={{ background: 'white', color: 'var(--meetops-purple)', border: 'none', padding: '14px 32px', fontSize: '1rem', fontWeight: 700, borderRadius: 'var(--radius-full)', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}>
+            <Link to="/login" className="btn btn-secondary" style={{ background: 'white', color: 'var(--meetops-purple)', border: 'none', padding: '14px 32px', fontSize: '1rem', fontWeight: 700, borderRadius: 'var(--radius-full)', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }} title="Sign in to start booking – new users can create an account from the sign-in page">
               Get Started Now <ArrowRight size={16} />
             </Link>
           </div>
