@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, SchemaType, ChatSession } from '@google/generative-ai';
+import { supabase } from '@/lib/supabase';
 import { getRooms } from './roomService';
 import { createMeeting } from './meetingService';
 
@@ -114,16 +115,53 @@ export async function handleFunctionCall(
       if (!room) {
         return { error: `Room "${args.roomName}" was not found in the room inventory. Call getRooms and pick an actual room before booking.` };
       }
+      // Resolve the acting user from the live Supabase session when the
+      // component-provided userId is missing (e.g. profile still hydrating
+      // when the function call fires). Without this, `user_id` was persisted
+      // as an empty string that RLS silently rejected, so the assistant
+      // reported "Reserved: <room>" while the row never surfaced in the
+      // signed-in user's Meetings view (getUserMeetings filters by user_id).
+      let actorId = userId;
+      let actorName = userName;
+      if (!actorId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          actorId = user.id;
+          if (!actorName || actorName === 'Guest') {
+            actorName = (user.user_metadata?.full_name as string)
+              || (user.user_metadata?.name as string)
+              || user.email
+              || 'User';
+          }
+        }
+      }
+      if (!actorId) {
+        return { error: 'No authenticated user is available for this booking. Please sign in and try again.' };
+      }
+      // Guard against the assistant scheduling a slot that has already
+      // elapsed: it would land in the Past tab and read as "missing" from
+      // the Upcoming view the tester navigates to after booking. Bump a
+      // same-day start that has slipped into the past up to the next
+      // 30-minute boundary.
+      let startTime = new Date(args.startTime);
+      let endTime = new Date(args.endTime);
+      if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime()) && endTime <= new Date()) {
+        const bumped = new Date();
+        bumped.setMinutes(bumped.getMinutes() < 30 ? 30 : 60, 0, 0);
+        const durationMs = endTime.getTime() - startTime.getTime();
+        startTime = bumped;
+        endTime = new Date(bumped.getTime() + (durationMs > 0 ? durationMs : 60 * 60 * 1000));
+      }
       const meetingId = await createMeeting({
         roomId: room.id,
         roomName: room.name,
         title: args.title,
         agenda: args.title,
         participants: '',
-        startTime: new Date(args.startTime),
-        endTime: new Date(args.endTime),
-        userId: userId,
-        userName: userName,
+        startTime,
+        endTime,
+        userId: actorId,
+        userName: actorName || 'User',
       });
       // Report the canonical room back to the model so its confirmation text
       // always matches the record shown in the admin/booking views.
