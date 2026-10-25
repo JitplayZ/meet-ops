@@ -93,9 +93,30 @@ export async function handleFunctionCall(
 
     if (call.name === 'bookRoom') {
       const args = call.args;
+      // The LLM supplies roomId/roomName, but the pair can drift apart: it may
+      // echo the requested room in its prose while passing another room's id
+      // (or name) in the function args, and createMeeting stores the
+      // denormalized room_name that the Admin pending-approvals list renders.
+      // Treat the real inventory as the source of truth: resolve the room from
+      // the requested name first (exact, then longest partial match), fall
+      // back to the supplied id, and always persist the canonical id + name.
+      const rooms = await getRooms();
+      const norm = (s?: string) => (s || '').trim().toLowerCase();
+      const wanted = norm(args.roomName);
+      let room = wanted ? rooms.find(r => norm(r.name) === wanted) : undefined;
+      if (!room && wanted) {
+        const partial = rooms
+          .filter(r => norm(r.name) && (wanted.includes(norm(r.name)) || norm(r.name).includes(wanted)))
+          .sort((a, b) => b.name.length - a.name.length);
+        room = partial[0];
+      }
+      if (!room) room = rooms.find(r => r.id === args.roomId);
+      if (!room) {
+        return { error: `Room "${args.roomName}" was not found in the room inventory. Call getRooms and pick an actual room before booking.` };
+      }
       const meetingId = await createMeeting({
-        roomId: args.roomId,
-        roomName: args.roomName,
+        roomId: room.id,
+        roomName: room.name,
         title: args.title,
         agenda: args.title,
         participants: '',
@@ -104,7 +125,9 @@ export async function handleFunctionCall(
         userId: userId,
         userName: userName,
       });
-      return { success: true, message: 'Room booked successfully', meetingId };
+      // Report the canonical room back to the model so its confirmation text
+      // always matches the record shown in the admin/booking views.
+      return { success: true, message: `Room "${room.name}" booked successfully`, meetingId, roomId: room.id, roomName: room.name };
     }
 
     return { error: 'Function not found' };
