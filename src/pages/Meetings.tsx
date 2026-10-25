@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMeetings, getUserMeetings, cancelMeeting } from '@/services/meetingService';
@@ -89,16 +89,41 @@ export default function Meetings() {
   // can never surface future/pending items (and vice versa).
   const filtered = (tab === 'upcoming' ? upcoming : past).filter(matchesFilters);
 
-  // A just-created booking may only match the other tab; switch to it rather
-  // than pretending the search found nothing.
+  // Auto-reveal a newly-created booking when the landing tab is empty.
+  //
+  // Previously this effect fired whenever `tab` changed too, which meant an
+  // explicit "Past" click was silently flipped back to "Upcoming" as soon as
+  // the search term matched a future meeting. The tester saw the Past view
+  // "not sticking" while a search was active ("The page continued to show
+  // Upcoming instead") and a fresh assistant booking that landed in Past
+  // (because its end time had already elapsed) never surfaced on the default
+  // Upcoming view.
+  //
+  // The fix: remember which tab the user last chose themselves and only
+  // consider an automatic switch when the filter signature or the meetings
+  // list actually changed. Manual tab clicks are respected; empty landing
+  // tabs still reveal the other side's matches.
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  const filtersKey = `${searchQuery}\u0000${selectedRoom}\u0000${selectedDate}`;
+  const lastSwitchKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!hasActiveFilters || filtered.length > 0) return;
-    const other = tab === 'upcoming' ? past : upcoming;
-    if (other.some(matchesFilters)) {
-      setTab(tab === 'upcoming' ? 'past' : 'upcoming');
+    // Skip if we already auto-switched for this exact filter/meetings state.
+    const currentMeetings = tabRef.current === 'upcoming' ? upcoming : past;
+    const otherMeetings = tabRef.current === 'upcoming' ? past : upcoming;
+    const activeMatches = currentMeetings.filter(matchesFilters).length;
+    const otherMatches = otherMeetings.filter(matchesFilters).length;
+    const key = `${filtersKey}\u0000${meetings.length}\u0000${meetings[0]?.id ?? ''}`;
+    if (lastSwitchKeyRef.current === key) return;
+    if (activeMatches > 0 || otherMatches === 0) {
+      lastSwitchKeyRef.current = key;
+      return;
     }
+    lastSwitchKeyRef.current = key;
+    setTab(tabRef.current === 'upcoming' ? 'past' : 'upcoming');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasActiveFilters, searchQuery, selectedRoom, selectedDate, tab, meetings]);
+  }, [filtersKey, meetings]);
 
   const toggleRowExpansion = (meetingId: string) => {
     setExpandedRows(prev => 
