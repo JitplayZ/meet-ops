@@ -137,6 +137,14 @@ export default function ChatBot() {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // Notify any mounted page that consumes meeting data (Meetings,
+      // Calendar, Dashboard) so the list refreshes without a full navigation
+      // cycle. Previously the user had to leave and re-enter /meetings to see
+      // an assistant-created booking.
+      if (responseText && /booked|reserved|success/i.test(responseText)) {
+        window.dispatchEvent(new CustomEvent('meetops:booking-created'));
+      }
     } catch (err: any) {
       let fallbackText: string | null = null;
       try {
