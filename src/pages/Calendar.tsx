@@ -116,11 +116,19 @@ export default function CalendarPage() {
     const meetingTitle = cancelTarget.title;
     try {
       await cancelMeeting(meetingId);
-      setMeetings(prev =>
-        prev.map(m => m.id === meetingId ? { ...m, status: 'cancelled' as const } : m)
-      );
+      // Refetch from source-of-truth instead of only patching local state.
+      // The optimistic `status: 'cancelled'` map left stale copies of the
+      // event visible whenever the underlying query returned a differently
+      // shaped row (or another concurrent mutation slipped in), which made
+      // the E2E "cancel removes the booking" flow see the event still
+      // rendered in the grid after the confirmation banner appeared.
+      const fresh = await getMeetings();
+      setMeetings(fresh);
+      // Close the details drawer for the cancelled booking so the tester
+      // is not left looking at a stale "Event Details" panel that still
+      // names the cancelled meeting as if it were live on the calendar.
       if (selectedMeeting?.id === meetingId) {
-        setSelectedMeeting(prev => prev ? { ...prev, status: 'cancelled' as const } : null);
+        setSelectedMeeting(null);
       }
       setCancelNotice(`Booking "${meetingTitle}" was cancelled and removed from the calendar.`);
     } catch (e) {
