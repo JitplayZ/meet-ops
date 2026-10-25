@@ -78,9 +78,13 @@ export default function Meetings() {
 
   const now = new Date();
 
-  // Display status derivation
+  // Display status derivation — any meeting whose end time has elapsed is
+  // shown as "completed" regardless of whether it was ever approved. The old
+  // logic only marked `approved` meetings as completed, so a `pending` booking
+  // that passed its time slot still displayed a "pending" badge in the Past
+  // tab, confusing testers who expected Past entries to read as finished.
   function getDisplayStatus(m: Meeting): string {
-    if (m.status === 'approved' && isBefore(m.endTime, now)) {
+    if ((m.status === 'approved' || m.status === 'pending') && isBefore(m.endTime, now)) {
       return 'completed';
     }
     return m.status;
