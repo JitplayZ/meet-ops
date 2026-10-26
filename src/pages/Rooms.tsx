@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getRooms, createRoom, updateRoom, deleteRoom } from '@/services/roomService';
+import { getMeetings } from '@/services/meetingService';
 import {
   Plus,
   Edit2,
@@ -15,7 +16,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import type { Room } from '@/types';
+import type { Meeting, Room } from '@/types';
 
 // Mock images to cycle through
 const ROOM_IMAGES = [
@@ -23,6 +24,16 @@ const ROOM_IMAGES = [
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAXaLfV5mH9_LxbdSWizPWZJRU5BUgaGGTftX8q7AI2ZyJ2lnftjNIjZvT35Cx_UIrhO7ht7KyQj0u-Ic7Tfmh73HeD5AoYcWYKRMRf5_a2-fqzrInewpgU2BsRi3f7Qe9mYReXAVS9cmsWySKVuaPJqWYNLW6NCmVmgPfXP5bQBZ2SlXSMjG561OVQyWcvoVCtUxPSdACfp_KTaGRyrj_lay1izsX03fGhPFkCCo9Ztr8FzrD1vYNjgxS9fOHCicjwMPQHhB8oZ_w",
   "https://lh3.googleusercontent.com/aida-public/AB6AXuASK9KuaKpD5NH1nrjGEnhDnnE3uEvZBa40DWiGsPT5yNg-hgGa2nAGpSg1Dweor5ktHSUcckSelLFbndxV4lmsnMBFAmh6sCUdB7hZNnWSm_yzvzWpFdQOzK6TQ4Xar2D93gz7OolGv75bMbGKLtKh4e2AAKw2EWVHFgYNH_yGDVZ79ltHqaffvSfg0K-mRAlFjqvRXLmOI4BbbCvJZmgFLBiXdBT2g56lwcQ1uHLNzov3KFnUamus_gqAqkQF4kmkdrKZFi8SEms"
 ];
+
+// Amenity filter keys must match the vocabulary rooms actually store in
+// equipment (e.g. "VC setup", "Polycom", "Monitor", "screen"), mirroring the
+// synonym mapping used for the badges rendered on the cards.
+const AMENITY_SYNONYMS: Record<string, RegExp> = {
+  display: /display|tv|screen|monitor|projector/i,
+  video: /video|polycom|camera|\bvc\b|zoom/i,
+  whiteboard: /whiteboard|board/i,
+  accessible: /accessible|wheelchair|ada/i,
+};
 
 export default function Rooms() {
   const { profile } = useAuth();
@@ -36,12 +47,15 @@ export default function Rooms() {
   const [capacityFilters, setCapacityFilters] = useState<string[]>(['conference']); // default checking 5-10 conference
   const [selectedFloor, setSelectedFloor] = useState('All Floors');
   const [requiredAmenities, setRequiredAmenities] = useState<string[]>([]);
-  const [instantBookable, setInstantBookable] = useState(true);
+  const [instantBookable, setInstantBookable] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
 
   const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
     loadRooms();
+    getMeetings().then(setMeetings).catch(console.error);
   }, []);
 
   async function loadRooms() {
@@ -63,23 +77,37 @@ export default function Rooms() {
 
   function openCreate() {
     setEditingRoom(null);
+    setSaveError('');
     setShowModal(true);
   }
 
   function openEdit(room: Room) {
     setEditingRoom(room);
+    setSaveError('');
     setShowModal(true);
   }
 
   async function handleSave(data: Omit<Room, 'id' | 'createdAt'>) {
-    if (editingRoom) {
-      await updateRoom(editingRoom.id, data);
-    } else {
-      await createRoom(data);
+    try {
+      if (editingRoom) {
+        await updateRoom(editingRoom.id, data);
+      } else {
+        await createRoom(data);
+      }
+      setShowModal(false);
+      // Active filters (name search, capacity range, floor, amenities) can
+      // silently hide the room that was just created/updated. Clear them so
+      // the inventory list always reflects the saved room.
+      setSearchQuery('');
+      setCapacityFilters([]);
+      setSelectedFloor('All Floors');
+      setRequiredAmenities([]);
+      setInstantBookable(false);
+      setLoading(true);
+      await loadRooms();
+    } catch (e: any) {
+      setSaveError(e.message || 'Failed to save room. Please try again.');
     }
-    setShowModal(false);
-    setLoading(true);
-    await loadRooms();
   }
 
   const handleCapacityToggle = (capRange: string) => {
@@ -94,8 +122,29 @@ export default function Rooms() {
     );
   };
 
+  // A room is "instant bookable" when it is free for the next hour — i.e. no
+  // pending/approved meeting overlaps the window [now, now + 1h]. Previously
+  // the toggle was a decorative control (never referenced in the filter
+  // predicate), so switching it had no visible effect on the card list.
+  const busyRoomIds = useMemo(() => {
+    const now = new Date();
+    const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
+    const set = new Set<string>();
+    for (const m of meetings) {
+      if (m.status === 'cancelled' || m.status === 'declined') continue;
+      // Overlap: meeting starts before window-end AND ends after window-start
+      if (m.startTime < inOneHour && m.endTime > now) {
+        set.add(m.roomId);
+      }
+    }
+    return set;
+  }, [meetings]);
+
   // Filter items logic
   const filteredRooms = rooms.filter(room => {
+    // 0. Instant Bookable: when enabled, hide rooms currently occupied
+    if (instantBookable && busyRoomIds.has(room.id)) return false;
+
     // 1. Name search
     const matchesSearch = room.name.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -110,17 +159,22 @@ export default function Rooms() {
       });
     }
 
-    // 3. Location Floor
+    // 3. Location Floor ("Floor 4" must match "floor 4", "4th floor", "flr 4")
     let matchesFloor = selectedFloor === 'All Floors';
     if (selectedFloor !== 'All Floors') {
       const floorNum = selectedFloor.replace(/\D/g, ''); // Extract digits
-      matchesFloor = room.location?.toLowerCase().includes(`floor ${floorNum}`) || room.location?.toLowerCase().includes(`flr ${floorNum}`) || false;
+      const loc = room.location?.toLowerCase() || '';
+      const pattern = new RegExp(`(floor|flr)\\s*${floorNum}\\b|\\b${floorNum}(st|nd|rd|th)\\s*floor`);
+      matchesFloor = pattern.test(loc);
     }
 
-    // 4. Required Amenities
-    const matchesAmenities = requiredAmenities.every(amenity => 
-      room.equipment?.some(eq => eq.toLowerCase().includes(amenity.toLowerCase()))
-    );
+    // 4. Required Amenities (synonym-aware, see AMENITY_SYNONYMS)
+    const matchesAmenities = requiredAmenities.every(amenity => {
+      const pattern = AMENITY_SYNONYMS[amenity];
+      const equipmentList = room.equipment || [];
+      if (pattern) return equipmentList.some(eq => pattern.test(eq));
+      return equipmentList.some(eq => eq.toLowerCase().includes(amenity.toLowerCase()));
+    });
 
     return matchesSearch && matchesCapacity && matchesFloor && matchesAmenities;
   });
@@ -155,6 +209,33 @@ export default function Rooms() {
           )}
         </div>
       </div>
+
+      {/* Save Error Alert */}
+      {saveError && (
+        <div
+          style={{
+            marginBottom: 24,
+            padding: '12px 16px',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--color-error-container)',
+            border: '1px solid var(--color-error)',
+            color: 'var(--color-on-error-container)',
+            fontSize: '0.8125rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span>{saveError}</span>
+          <button
+            onClick={() => setSaveError('')}
+            className="btn btn-ghost btn-sm"
+            style={{ padding: 2, color: 'var(--color-on-error-container)' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Main Layout: Sidebar filters + Grid */}
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
@@ -325,6 +406,7 @@ export default function Rooms() {
                   setCapacityFilters([]);
                   setSelectedFloor('All Floors');
                   setRequiredAmenities([]);
+                  setInstantBookable(false);
                 }}
               >
                 Clear Filters
@@ -342,8 +424,10 @@ export default function Rooms() {
                 // Cycle through mock cover images
                 const coverImage = ROOM_IMAGES[idx % ROOM_IMAGES.length];
                 
-                // Determine mock available status
-                const isAvailable = idx % 2 === 0;
+                // Real availability: room is free when it has no active
+                // booking overlapping the next hour (same logic the
+                // Instant Bookable filter uses).
+                const isAvailable = !busyRoomIds.has(room.id);
 
                 return (
                   <div

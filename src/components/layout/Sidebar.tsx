@@ -32,8 +32,19 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    // Complete the async Supabase sign-out first so localStorage/sessionStorage
+    // tokens are cleared before we hard-navigate. A full page navigation (not
+    // react-router's `navigate`) sidesteps ProtectedRoute's race: when the
+    // auth-state update fires during logout, the guard would otherwise replace
+    // our `/` redirect with a `/login` navigation. Reloading also remounts
+    // AuthProvider against a clean session, so Landing renders unauthenticated
+    // with visible sign-in entry points.
+    try {
+      await logout();
+    } catch {
+      // Even if signOut throws, force the URL change below.
+    }
+    window.location.assign('/');
   };
 
   const isAdmin = profile?.role === 'admin';

@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import MainLayout from '@/components/layout/MainLayout';
@@ -46,6 +46,13 @@ export default function App() {
             <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><Admin /></ProtectedRoute>} />
             <Route path="/settings" element={<Settings />} />
           </Route>
+
+          {/* Catch-all: unmatched paths redirect to the landing page so the
+              user never sees a blank screen or a server-level 404. Protected
+              routes that the user lost access to (post-logout) are handled
+              by ProtectedRoute's <Navigate to="/login"/>, but any truly
+              unknown path is sent home. */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </ThemeProvider>

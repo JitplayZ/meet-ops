@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getMeetings, cancelMeeting } from '@/services/meetingService';
 import { getRooms } from '@/services/roomService';
-import { format, startOfWeek, addDays, isSameDay, addWeeks, subWeeks } from 'date-fns';
+import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,49 +23,119 @@ const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }
   cancelled: { bg: 'rgba(255, 180, 171, 0.15)', border: 'var(--color-error)', text: 'var(--color-error)' },
 };
 
+// "2026-10-25" -> local-midnight Date (avoids UTC parsing shifts)
+function toDateFromInput(value: string): Date | null {
+  if (!value) return null;
+  const d = new Date(`${value}T00:00:00`);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 export default function CalendarPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlDate = searchParams.get('date') || '';
+  const urlMeetingId = searchParams.get('meeting') || '';
+
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  // The date filter and the rendered week share one source of truth: the
+  // anchor date. Picking a date (or arriving with ?date= from a booking
+  // flow) moves the grid to the week containing that date.
+  const [currentDate, setCurrentDate] = useState(() => toDateFromInput(urlDate) || new Date());
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  // In-page cancellation flow. The previous native window.confirm() rendered an
+  // OS dialog that lives outside the page DOM (invisible to screenshots/automation
+  // and auto-dismissed in E2E runs), and left no on-page confirmation. These two
+  // pieces of state drive a visible confirm modal and a success notice instead.
+  const [cancelTarget, setCancelTarget] = useState<Meeting | null>(null);
+  const [cancelNotice, setCancelNotice] = useState<string | null>(null);
 
   // Filter checkboxes
   const [selectedRoomTypes, setSelectedRoomTypes] = useState<string[]>(['boardroom', 'huddle']);
-  const [selectedFloor, setSelectedFloor] = useState('HQ - Floor 4');
+  const [selectedFloor, setSelectedFloor] = useState('All Floors');
+  const [selectedDate, setSelectedDate] = useState(urlDate);
+
+  const FLOOR_MATCHERS: Record<string, (room: Room) => boolean> = {
+    'HQ - Floor 4': r => /floor\s*4|4th\s*floor/i.test(r.location || ''),
+    'HQ - Floor 12': r => /floor\s*12|12th\s*floor/i.test(r.location || ''),
+    'Executive Wing': r => /executive/i.test(r.location || '') || /executive|boardroom/i.test(r.name || ''),
+  };
 
   useEffect(() => {
     Promise.all([getMeetings(), getRooms()])
       .then(([m, r]) => {
         setMeetings(m);
         setRooms(r);
-        // Automatically select the first meeting to fill details drawer initially
-        if (m.length > 0) {
-          const active = m.find(item => item.status !== 'cancelled' && item.status !== 'declined');
-          if (active) setSelectedMeeting(active);
+        // Fill the details drawer with the booking named in the URL (set
+        // right after scheduling), otherwise the nearest still-active
+        // meeting — never an arbitrary "first row" unrelated to the view.
+        const active = m.filter(item => item.status !== 'cancelled' && item.status !== 'declined');
+        const fromUrl = urlMeetingId ? active.find(item => item.id === urlMeetingId) : undefined;
+        if (fromUrl) {
+          setSelectedMeeting(fromUrl);
+          return;
         }
+        const now = new Date();
+        const upcoming = active
+          .filter(item => item.endTime >= now)
+          .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+        if (upcoming.length > 0) setSelectedMeeting(upcoming[0]);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [urlMeetingId, urlDate]);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Starts on Monday
-  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon - Fri (5 columns)
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon - Sun
   const hours = Array.from({ length: 8 }, (_, i) => i + 9); // 9 AM to 4 PM start slots (Ends at 5 PM)
 
-  const handleCancelMeeting = async (meetingId: string) => {
-    if (!confirm('Are you sure you want to cancel this booking?')) return;
+  const handleDateFilterChange = (value: string) => {
+    setSelectedDate(value);
+    // Keep the rendered week in sync with the filter so filtered meetings
+    // are always inside the visible grid range.
+    const d = toDateFromInput(value);
+    if (d) setCurrentDate(d);
+  };
+
+  const handleSlotBook = (day: Date, hour: number) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateStr = format(day, 'yyyy-MM-dd');
+    navigate(
+      `/meetings/new?date=${dateStr}&startTime=${pad(hour)}:00&endTime=${pad(hour + 1)}:00`,
+    );
+  };
+
+  const handleCancelMeeting = (meeting: Meeting) => {
+    setCancelTarget(meeting);
+  };
+
+  const confirmCancelMeeting = async () => {
+    if (!cancelTarget) return;
+    const meetingId = cancelTarget.id;
+    const meetingTitle = cancelTarget.title;
     try {
       await cancelMeeting(meetingId);
-      setMeetings(prev =>
-        prev.map(m => m.id === meetingId ? { ...m, status: 'cancelled' as const } : m)
-      );
+      // Refetch from source-of-truth instead of only patching local state.
+      // The optimistic `status: 'cancelled'` map left stale copies of the
+      // event visible whenever the underlying query returned a differently
+      // shaped row (or another concurrent mutation slipped in), which made
+      // the E2E "cancel removes the booking" flow see the event still
+      // rendered in the grid after the confirmation banner appeared.
+      const fresh = await getMeetings();
+      setMeetings(fresh);
+      // Close the details drawer for the cancelled booking so the tester
+      // is not left looking at a stale "Event Details" panel that still
+      // names the cancelled meeting as if it were live on the calendar.
       if (selectedMeeting?.id === meetingId) {
-        setSelectedMeeting(prev => prev ? { ...prev, status: 'cancelled' as const } : null);
+        setSelectedMeeting(null);
       }
+      setCancelNotice(`Booking "${meetingTitle}" was cancelled and removed from the calendar.`);
     } catch (e) {
       console.error(e);
+      setCancelNotice('Failed to cancel the booking. Please try again.');
     }
+    setCancelTarget(null);
   };
 
   const handleRoomTypeToggle = (type: string) => {
@@ -73,13 +144,42 @@ export default function CalendarPage() {
     );
   };
 
-  // Find meetings that occur in the weekly grid slots (Mon-Fri, between 9am and 5pm)
+  const roomById = new Map(rooms.map(r => [r.id, r]));
+
+  const matchesFilters = (m: Meeting) => {
+    const room = roomById.get(m.roomId);
+    // Room type filter: boardroom = capacity 10+, huddle = capacity <10.
+    // Meetings whose room is unknown to the inventory stay visible.
+    if (selectedRoomTypes.length > 0 && room) {
+      const capacity = room.capacity ?? 0;
+      const isBoardroom = capacity >= 10;
+      const isHuddle = capacity < 10;
+      const typeMatch =
+        (selectedRoomTypes.includes('boardroom') && isBoardroom) ||
+        (selectedRoomTypes.includes('huddle') && isHuddle);
+      if (!typeMatch) return false;
+    }
+    // Floor filter
+    if (selectedFloor !== 'All Floors' && room) {
+      const matcher = FLOOR_MATCHERS[selectedFloor];
+      if (matcher && !matcher(room)) return false;
+    }
+    // Date filter (compare in local time)
+    if (selectedDate) {
+      const localDay = `${m.startTime.getFullYear()}-${String(m.startTime.getMonth() + 1).padStart(2, '0')}-${String(m.startTime.getDate()).padStart(2, '0')}`;
+      if (localDay !== selectedDate) return false;
+    }
+    return true;
+  };
+
+  // Find meetings that occur in the weekly grid slots (Mon-Sun, between
+  // 9am and 5pm). Weekend bookings must render too - E2E flows book on
+  // Saturdays and Sundays.
   const getWeeklyMeetings = () => {
     return meetings.filter(m => {
       if (m.status === 'cancelled' || m.status === 'declined') return false;
-      const isMonToFri = m.startTime.getDay() >= 1 && m.startTime.getDay() <= 5;
-      const isCorrectWeek = m.startTime >= weekStart && m.startTime <= addDays(weekStart, 5);
-      return isMonToFri && isCorrectWeek;
+      const isCorrectWeek = m.startTime >= weekStart && m.startTime < addDays(weekStart, 7);
+      return isCorrectWeek && matchesFilters(m);
     });
   };
 
@@ -124,6 +224,7 @@ export default function CalendarPage() {
                   height: 36,
                 }}
               >
+                <option>All Floors</option>
                 <option>HQ - Floor 4</option>
                 <option>HQ - Floor 12</option>
                 <option>Executive Wing</option>
@@ -217,19 +318,21 @@ export default function CalendarPage() {
             {/* navigation arrows */}
             <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-surface-container-low)', padding: 4, borderRadius: '6px', border: '1px solid var(--color-border-subtle)' }}>
               <button 
-                onClick={() => setCurrentDate(prev => subWeeks(prev, 1))}
+                onClick={() => { setCurrentDate(prev => subWeeks(prev, 1)); setSelectedDate(''); }}
+                aria-label="Previous week"
                 style={{ background: 'transparent', border: 'none', color: 'var(--color-on-surface-variant)', cursor: 'pointer', padding: 2, borderRadius: '4px', display: 'flex' }}
               >
                 <ChevronLeft size={16} />
               </button>
               <button 
-                onClick={() => setCurrentDate(new Date())}
+                onClick={() => { setCurrentDate(new Date()); setSelectedDate(''); }}
                 style={{ background: 'transparent', border: 'none', color: 'var(--color-on-surface)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, padding: '2px 8px' }}
               >
                 Today
               </button>
               <button 
-                onClick={() => setCurrentDate(prev => addWeeks(prev, 1))}
+                onClick={() => { setCurrentDate(prev => addWeeks(prev, 1)); setSelectedDate(''); }}
+                aria-label="Next week"
                 style={{ background: 'transparent', border: 'none', color: 'var(--color-on-surface-variant)', cursor: 'pointer', padding: 2, borderRadius: '4px', display: 'flex' }}
               >
                 <ChevronRight size={16} />
@@ -237,12 +340,73 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', background: 'var(--color-surface-container-low)', padding: 4, borderRadius: '8px', border: '1px solid var(--color-border-subtle)' }}>
-            <button className="btn btn-ghost btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Day</button>
-            <button className="btn btn-secondary btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface)', background: 'var(--color-surface-container-highest)', border: 'none', boxShadow: 'none' }}>Week</button>
-            <button className="btn btn-ghost btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Month</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Date filter: moves the visible week to the selected date */}
+            <input
+              type="date"
+              aria-label="Filter by date"
+              value={selectedDate}
+              onChange={e => handleDateFilterChange(e.target.value)}
+              className="input"
+              style={{
+                background: 'var(--color-surface-container-low)',
+                border: '1px solid var(--color-border-subtle)',
+                color: 'var(--color-on-surface)',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                height: 32,
+                width: 140,
+              }}
+            />
+            {selectedDate && (
+              <button
+                onClick={() => setSelectedDate('')}
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: '11px', color: 'var(--color-on-surface-variant)', padding: '4px 8px' }}
+              >
+                Clear date
+              </button>
+            )}
+            <span style={{ fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>
+              {weeklyMeetings.length} meeting{weeklyMeetings.length === 1 ? '' : 's'} shown
+            </span>
+            <div style={{ display: 'flex', background: 'var(--color-surface-container-low)', padding: 4, borderRadius: '8px', border: '1px solid var(--color-border-subtle)' }}>
+              <button className="btn btn-ghost btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Day</button>
+              <button className="btn btn-secondary btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface)', background: 'var(--color-surface-container-highest)', border: 'none', boxShadow: 'none' }}>Week</button>
+              <button className="btn btn-ghost btn-sm" style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Month</button>
+            </div>
           </div>
         </div>
+
+        {/* Cancellation confirmation banner */}
+        {cancelNotice && (
+          <div
+            id="cancel-notice"
+            role="status"
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              margin: '12px 24px 0',
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(137, 206, 255, 0.12)',
+              border: '1px solid var(--color-secondary)',
+              color: 'var(--color-on-surface)',
+              fontSize: '0.8125rem',
+            }}
+          >
+            <span>{cancelNotice}</span>
+            <button
+              onClick={() => setCancelNotice(null)}
+              aria-label="Dismiss cancellation notice"
+              style={{ background: 'transparent', border: 'none', color: 'var(--color-on-surface-variant)', cursor: 'pointer', padding: 2 }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* Calendar Grid wrapper */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
@@ -292,7 +456,7 @@ export default function CalendarPage() {
           <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
             
             {/* Grid Container */}
-            <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(5, 1fr)', minHeight: 640 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7, 1fr)', minHeight: 640 }}>
               
               {/* Y Axis: Time Labels */}
               <div style={{ gridColumnStart: 1, borderRight: '1px solid var(--color-border-subtle)', background: 'var(--color-surface-dim)', paddingTop: 16 }}>
@@ -316,16 +480,45 @@ export default function CalendarPage() {
                     background: 'var(--color-surface-dim)',
                   }}
                 >
-                  {/* Horizontal lines */}
+                  {/* Clickable hour slots: book this day/hour directly */}
                   {hours.map(hour => (
-                    <div 
-                      key={hour} 
-                      style={{ 
-                        height: 80, 
+                    <button
+                      key={hour}
+                      type="button"
+                      aria-label={`Book ${format(day, 'EEE MMM d')} at ${format(new Date(2024, 0, 1, hour), 'h a')}`}
+                      title={`Book ${format(day, 'EEE MMM d')} at ${format(new Date(2024, 0, 1, hour), 'h a')}`}
+                      onClick={() => handleSlotBook(day, hour)}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        height: 80,
                         borderTop: '1px solid var(--color-border-subtle)',
                         boxSizing: 'border-box',
-                      }} 
-                    />
+                        background: 'transparent',
+                        borderLeft: 'none',
+                        borderRight: 'none',
+                        borderBottom: 'none',
+                        cursor: 'pointer',
+                        position: 'relative',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139, 92, 246, 0.08)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 6,
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          color: 'var(--meetops-purple)',
+                          opacity: 0,
+                        }}
+                        className="slot-plus-hint"
+                      >
+                        + Book
+                      </span>
+                    </button>
                   ))}
 
                   {/* Dynamic absolute event cards for this day */}
@@ -513,7 +706,7 @@ export default function CalendarPage() {
             <div style={{ marginTop: 'auto', display: 'flex', gap: 8, paddingTop: 16 }}>
               {selectedMeeting.status !== 'cancelled' && (
                 <button
-                  onClick={() => handleCancelMeeting(selectedMeeting.id)}
+                  onClick={() => handleCancelMeeting(selectedMeeting)}
                   className="btn btn-secondary"
                   style={{ flex: 1, borderColor: 'var(--color-error)', color: 'var(--color-error)', fontSize: '0.8125rem', justifyContent: 'center' }}
                 >
@@ -530,6 +723,34 @@ export default function CalendarPage() {
           </div>
         )}
       </aside>
+
+      {/* Show the "+ Book" affordance on hour-slot hover */}
+      <style>{`button:hover > .slot-plus-hint { opacity: 1 !important; }`}</style>
+
+      {/* Cancel confirmation modal (portal to <body> so it is not affected by
+          the transformed `animate-fade-in` page container). */}
+      {cancelTarget && createPortal(
+        <div className="modal-overlay" onClick={() => setCancelTarget(null)}>
+          <div
+            className="modal-content"
+            role="dialog"
+            aria-modal="true"
+            id="cancel-booking-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ padding: 24, maxWidth: 420 }}
+          >
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: 12 }}>Cancel Booking</h2>
+            <p style={{ fontSize: '0.875rem', color: 'var(--color-on-surface-variant)', marginBottom: 24, lineHeight: 1.5 }}>
+              Are you sure you want to cancel <strong>"{cancelTarget.title}"</strong>? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setCancelTarget(null)}>Keep Booking</button>
+              <button className="btn btn-danger" id="confirm-cancel-btn" onClick={confirmCancelMeeting}>Cancel Booking</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
     </div>
   );

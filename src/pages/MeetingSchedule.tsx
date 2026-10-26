@@ -17,9 +17,10 @@ export default function MeetingSchedule() {
   const [roomId, setRoomId] = useState(searchParams.get('roomId') || '');
   const [roomName, setRoomName] = useState(searchParams.get('roomName') || '');
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState('');
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('10:00');
+  // Date/time can be prefilled from calendar time-slot booking links
+  const [date, setDate] = useState(searchParams.get('date') || '');
+  const [startTime, setStartTime] = useState(searchParams.get('startTime') || '09:00');
+  const [endTime, setEndTime] = useState(searchParams.get('endTime') || '10:00');
   const [agenda, setAgenda] = useState('');
   const [participants, setParticipants] = useState('');
   const [error, setError] = useState('');
@@ -41,6 +42,11 @@ export default function MeetingSchedule() {
     const startDate = new Date(`${dummyDate}T${startTime}`);
     const endDate = new Date(`${dummyDate}T${endTime}`);
 
+    if (!title.trim()) {
+      setError('Please enter a meeting title.');
+      return;
+    }
+
     if (startTime && endTime && endDate <= startDate) {
       setError('End time must be after start time.');
       return;
@@ -51,11 +57,19 @@ export default function MeetingSchedule() {
       return;
     }
 
+    // Reject past dates up-front: bookings for elapsed time never show in
+    // Upcoming lists or the current calendar week, which reads as "lost" data.
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (date < todayStr) {
+      setError('Meeting date cannot be in the past. Please pick today or a future date.');
+      return;
+    }
+
     setSaving(true);
     setError('');
 
     try {
-      await createMeeting({
+      const meetingId = await createMeeting({
         roomId,
         roomName,
         userId: profile.uid,
@@ -73,7 +87,9 @@ export default function MeetingSchedule() {
         message: `Your meeting for "${roomName}" on ${date} has been submitted for approval.`,
       });
 
-      navigate('/meetings');
+      // Land on the calendar week containing the booked date with the new
+      // booking selected, so it is immediately visible in the grid.
+      navigate(`/calendar?date=${date}&meeting=${meetingId}`);
     } catch (err: any) {
       setError(err.message || 'Failed to schedule meeting');
     } finally {

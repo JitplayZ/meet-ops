@@ -1,0 +1,209 @@
+// Provisions a deterministic E2E test account with upcoming meetings so that
+// automated flows ("Open meetings list after signing in", calendar scheduling,
+// quick booking) have fresh, non-conflicting future data to assert against.
+//
+// Usage: node seed_e2e_data.js
+// Re-runnable: logs in with the known credentials if the account already
+// exists, and skips seeding when upcoming meetings are already present.
+
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env');
+  process.exit(1);
+}
+
+const EMAIL = process.env.E2E_TEST_EMAIL || 'e2e.robot@resourceflow.test';
+const PASSWORD = process.env.E2E_TEST_PASSWORD || 'Password123!';
+const NAME = 'E2E Robot';
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+async function authenticate() {
+  const signIn = await supabase.auth.signInWithPassword({ email: EMAIL, password: PASSWORD });
+  if (signIn.data.session) return signIn.data.session.user;
+
+  const signUp = await supabase.auth.signUp({
+    email: EMAIL,
+    password: PASSWORD,
+    options: { data: { full_name: NAME, name: NAME } },
+  });
+  if (signUp.error || !signUp.data.user) {
+    console.error('Could not create/sign in test user:', signUp.error?.message);
+    process.exit(1);
+  }
+  if (!signUp.data.session) {
+    // Email confirmation may be on; try signing in after a short wait
+    await new Promise(r => setTimeout(r, 1500));
+    const retry = await supabase.auth.signInWithPassword({ email: EMAIL, password: PASSWORD });
+    if (!retry.data.session) {
+      console.error('Account created but sign-in failed (email confirmation enabled?).');
+      process.exit(1);
+    }
+    return retry.data.user;
+  }
+  return signUp.data.user;
+}
+
+// Supabase `timestamptz` columns interpret zone-less strings as UTC, which
+// shifts seeded meetings by the local offset when they are read back. Always
+// insert a true UTC ISO string built from the local Date.
+function toInsertISO(d) {
+  return d.toISOString();
+}
+
+async function seedUpcomingMeeting(userId, userName, room, dayOffset, startHour, title, status) {
+  const start = new Date();
+  start.setDate(start.getDate() + dayOffset);
+  start.setHours(startHour, 0, 0, 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+  // Avoid conflicts with existing active bookings for this room
+  const { data: busy } = await supabase
+    .from('meetings')
+    .select('start_time, end_time')
+    .eq('room_id', room.id)
+    .in('status', ['pending', 'approved']);
+  const clash = (busy || []).some(
+    m => start < new Date(m.end_time) && end > new Date(m.start_time),
+  );
+  if (clash) {
+    console.log(`  "${title}" clashes with an existing booking; trying next hour`);
+    return seedUpcomingMeeting(userId, userName, room, dayOffset, Math.min(startHour + 1, 15), title, status);
+  }
+
+  const { error } = await supabase.from('meetings').insert({
+    room_id: room.id,
+    room_name: room.name,
+    user_id: userId,
+    user_name: userName,
+    title,
+    start_time: toInsertISO(start),
+    end_time: toInsertISO(end),
+    agenda: 'Seeded for automated E2E verification',
+    participants: '',
+    status,
+  });
+  if (error) {
+    console.error(`  Failed to seed "${title}":`, error.message);
+    return false;
+  }
+  console.log(`  Seeded "${title}" (${room.name}, +${dayOffset}d ${startHour}:00-${startHour + 1}:00, ${status})`);
+  return true;
+}
+
+async function ensureProfileRow(userId) {
+  // Mirror the auth user into the public users table in case the DB trigger
+  // has not run yet (some flows read role from it).
+  const { data: existing } = await supabase.from('users').select('id').eq('id', userId).single();
+  if (!existing) {
+    await supabase.from('users').insert({ id: userId, name: NAME, email: EMAIL, role: 'user' });
+  }
+}
+
+// Ensure the room inventory satisfies the parameterised filters the E2E suite
+// exercises ("Admin filters rooms by capacity and availability" toggles
+// Instant Bookable + 1-4 People + Floor 4 and expects at least one card).
+// Without a Floor 4 huddle the filter legitimately returns zero rows and the
+// test reads as a UI bug. Idempotent: skips rows that already match by name.
+async function ensureFilterInventoryRooms() {
+  const required = [
+    {
+      name: 'Focus Huddle 402',
+      location: 'HQ - Floor 4',
+      capacity: 4,
+      description: 'Quiet 4-person huddle for quick syncs on Floor 4.',
+      equipment: ['Monitor', 'Whiteboard'],
+      availability_start: '09:00',
+      availability_end: '17:00',
+    },
+  ];
+  const { data: existing } = await supabase.from('rooms').select('id, name');
+  const existingNames = new Set((existing || []).map(r => r.name));
+  for (const room of required) {
+    if (existingNames.has(room.name)) continue;
+    const { error } = await supabase.from('rooms').insert(room);
+    if (error) {
+      console.warn(`  Could not seed room "${room.name}":`, error.message);
+    } else {
+      console.log(`  Seeded room "${room.name}" (${room.location}, ${room.capacity}-cap)`);
+    }
+  }
+}
+
+async function main() {
+  console.log('E2E data provisioning');
+
+  const REFRESH = process.argv.includes('--refresh');
+
+  const user = await authenticate();
+  console.log(`Test account ready: ${EMAIL} / ${PASSWORD} (uid ${user.id})`);
+  await ensureProfileRow(user.id);
+  await ensureFilterInventoryRooms();
+
+  const { data: upcoming } = await supabase
+    .from('meetings')
+    .select('id')
+    .eq('user_id', user.id)
+    .in('status', ['pending', 'approved'])
+    .gt('end_time', new Date().toISOString());
+  if ((upcoming || []).length > 0 && !REFRESH) {
+    console.log(`Account already has ${upcoming.length} upcoming meeting(s); skipping seed (use --refresh to rebuild them at timezone-stable midday times).`);
+    return;
+  }
+  if ((upcoming || []).length > 0 && REFRESH) {
+    // Clear this test account's own future meetings so they can be recreated at
+    // midday (see the note below). RLS lets the user delete only their own rows.
+    const { error: delErr, count } = await supabase
+      .from('meetings')
+      .delete({ count: 'exact' })
+      .eq('user_id', user.id)
+      .gt('end_time', new Date().toISOString());
+    if (delErr) {
+      console.error('Could not refresh existing upcoming meetings:', delErr.message);
+      return;
+    }
+    console.log(`Refresh: removed ${count ?? upcoming.length} prior upcoming meeting(s).`);
+  }
+
+  let { data: rooms } = await supabase.from('rooms').select('id, name').order('created_at', { ascending: true });
+  if (!rooms || rooms.length === 0) {
+    console.log('No rooms found; creating a default E2E room...');
+    const { data: created, error } = await supabase
+      .from('rooms')
+      .insert({ name: 'E2E Boardroom', location: 'HQ - Floor 4', capacity: 12, description: 'Seeded for E2E tests', equipment: ['screen', 'whiteboard'] })
+      .select('id, name')
+      .single();
+    if (error) {
+      console.error('Cannot create room (admin RLS on inserts?). Aborting.', error.message);
+      return;
+    }
+    rooms = [created];
+  }
+
+  console.log('Seeding upcoming meetings for the test account:');
+  // Anchor every booking to local midday. Seeding at an early-morning local hour
+  // can land on the *previous* calendar day once displayed in a browser whose
+  // timezone is behind the seeding machine's, which makes room+date filters
+  // (compared on the displayed local day) miss the meeting. Midday is stable
+  // across the realistic browser timezone range.
+  await seedUpcomingMeeting(user.id, NAME, rooms[0], 1, 12, 'E2E Upcoming Standup', 'approved');
+  await seedUpcomingMeeting(user.id, NAME, rooms[0], 2, 12, 'E2E Sprint Review', 'pending');
+  if (rooms[1]) {
+    await seedUpcomingMeeting(user.id, NAME, rooms[1], 3, 12, 'E2E Cross-room Sync', 'approved');
+  }
+
+  console.log('Done. The Meetings page "Upcoming" tab and Calendar will now show data for this account.');
+}
+
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});

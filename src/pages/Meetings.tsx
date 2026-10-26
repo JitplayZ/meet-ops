@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMeetings, getUserMeetings, cancelMeeting } from '@/services/meetingService';
 import { getRooms } from '@/services/roomService';
@@ -61,26 +62,86 @@ export default function Meetings() {
       .finally(() => setLoading(false));
   }, [profile]);
 
+  // Refetch meetings when the chat booking assistant signals a new booking.
+  // Without this, the already-mounted page would show stale data and the
+  // tester would conclude the assistant-created reservation was "not found in
+  // the Upcoming meetings schedule."
+  useEffect(() => {
+    if (!profile) return;
+    const handler = () => {
+      const fn = profile.role === 'admin' ? getMeetings : () => getUserMeetings(profile.uid);
+      fn().then(setMeetings).catch(console.error);
+    };
+    window.addEventListener('meetops:booking-created', handler);
+    return () => window.removeEventListener('meetops:booking-created', handler);
+  }, [profile]);
+
   const now = new Date();
 
-  // Display status derivation
+  // Display status derivation — any meeting whose end time has elapsed is
+  // shown as "completed" regardless of whether it was ever approved. The old
+  // logic only marked `approved` meetings as completed, so a `pending` booking
+  // that passed its time slot still displayed a "pending" badge in the Past
+  // tab, confusing testers who expected Past entries to read as finished.
   function getDisplayStatus(m: Meeting): string {
-    if (m.status === 'approved' && isBefore(m.endTime, now)) {
+    if ((m.status === 'approved' || m.status === 'pending') && isBefore(m.endTime, now)) {
       return 'completed';
     }
     return m.status;
   }
 
-  const upcoming = meetings.filter((m) => isAfter(m.endTime, now) && m.status !== 'cancelled');
-  const past = meetings.filter((m) => isBefore(m.endTime, now) || m.status === 'cancelled');
-  const displayed = tab === 'upcoming' ? upcoming : past;
+  const isUpcoming = (m: Meeting) =>
+    isAfter(m.endTime, now) && m.status !== 'cancelled' && m.status !== 'declined';
+  const upcoming = meetings.filter(isUpcoming);
+  const past = meetings.filter((m) => !isUpcoming(m));
+  const hasActiveFilters = Boolean(searchQuery || selectedRoom || selectedDate);
 
-  const filtered = displayed.filter((m) => {
+  const matchesFilters = (m: Meeting) => {
     const matchesSearch = m.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRoom = !selectedRoom || m.roomId === selectedRoom;
     const matchesDate = !selectedDate || format(new Date(m.startTime), 'yyyy-MM-dd') === selectedDate;
     return matchesSearch && matchesRoom && matchesDate;
-  });
+  };
+
+  // Filters and search always apply within the active tab, so the Past view
+  // can never surface future/pending items (and vice versa).
+  const filtered = (tab === 'upcoming' ? upcoming : past).filter(matchesFilters);
+
+  // Auto-reveal a newly-created booking when the landing tab is empty.
+  //
+  // Previously this effect fired whenever `tab` changed too, which meant an
+  // explicit "Past" click was silently flipped back to "Upcoming" as soon as
+  // the search term matched a future meeting. The tester saw the Past view
+  // "not sticking" while a search was active ("The page continued to show
+  // Upcoming instead") and a fresh assistant booking that landed in Past
+  // (because its end time had already elapsed) never surfaced on the default
+  // Upcoming view.
+  //
+  // The fix: remember which tab the user last chose themselves and only
+  // consider an automatic switch when the filter signature or the meetings
+  // list actually changed. Manual tab clicks are respected; empty landing
+  // tabs still reveal the other side's matches.
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  const filtersKey = `${searchQuery}\u0000${selectedRoom}\u0000${selectedDate}`;
+  const lastSwitchKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Skip if we already auto-switched for this exact filter/meetings state.
+    const currentMeetings = tabRef.current === 'upcoming' ? upcoming : past;
+    const otherMeetings = tabRef.current === 'upcoming' ? past : upcoming;
+    const activeMatches = currentMeetings.filter(matchesFilters).length;
+    const otherMatches = otherMeetings.filter(matchesFilters).length;
+    const key = `${filtersKey}\u0000${meetings.length}\u0000${meetings[0]?.id ?? ''}`;
+    if (lastSwitchKeyRef.current === key) return;
+    if (activeMatches > 0 || otherMatches === 0) {
+      lastSwitchKeyRef.current = key;
+      return;
+    }
+    lastSwitchKeyRef.current = key;
+    setTab(tabRef.current === 'upcoming' ? 'past' : 'upcoming');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey, meetings]);
 
   const toggleRowExpansion = (meetingId: string) => {
     setExpandedRows(prev => 
@@ -305,8 +366,19 @@ export default function Meetings() {
       {filtered.length === 0 ? (
         <div className="bento-card" style={{ padding: 60, textAlign: 'center' }}>
           <Calendar size={36} style={{ color: 'var(--color-outline)', marginBottom: 12, opacity: 0.5 }} />
-          <p style={{ color: 'var(--color-on-surface-variant)' }}>No {tab} meetings found</p>
-          {tab === 'upcoming' && !searchQuery && !selectedRoom && !selectedDate && (
+          {hasActiveFilters ? (
+            <>
+              <p style={{ color: 'var(--color-on-surface-variant)' }} id="no-filter-matches">
+                No {tab} meetings match your current filters.
+              </p>
+              <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '0.8125rem', marginTop: 6 }}>
+                Try a different room or date, or clear the filters.
+              </p>
+            </>
+          ) : (
+            <p style={{ color: 'var(--color-on-surface-variant)' }}>No {tab} meetings found</p>
+          )}
+          {tab === 'upcoming' && !hasActiveFilters && (
             <Link to="/meetings/new" className="btn btn-primary btn-sm" style={{ marginTop: 16 }}>
               <Plus size={14} /> Schedule a Meeting
             </Link>
@@ -500,8 +572,9 @@ export default function Meetings() {
         </div>
       )}
 
-      {/* Redesigned In-page Cancel Confirmation Modal */}
-      {cancelTarget && (
+      {/* Redesigned In-page Cancel Confirmation Modal — portaled to <body> so the
+          transformed `animate-fade-in` page container does not push it off-screen. */}
+      {cancelTarget && createPortal(
         <div className="modal-overlay" onClick={() => setCancelTarget(null)} style={{ zIndex: 100 }}>
           <div 
             className="modal-content glass-panel" 
@@ -526,7 +599,8 @@ export default function Meetings() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

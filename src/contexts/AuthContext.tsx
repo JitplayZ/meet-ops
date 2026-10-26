@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { UserProfile, UserRole } from '@/types';
@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  isLoggingOut: () => boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, role?: UserRole) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -19,6 +20,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  // Ref (not state) so the flag flips synchronously the instant logout()
+  // is called, well before React's next render. ProtectedRoute reads it via
+  // isLoggingOut() to skip its /login guard redirect while the caller
+  // navigates to a public route.
+  const loggingOutRef = useRef(false);
 
   useEffect(() => {
     // Get initial session
@@ -129,10 +135,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setProfile(null);
-    setUser(null);
+    loggingOutRef.current = true;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } finally {
+      setProfile(null);
+      setUser(null);
+      // Release after the current task's renders settle so ProtectedRoute
+      // does not flash a /login redirect while we navigate away.
+      setTimeout(() => {
+        loggingOutRef.current = false;
+      }, 100);
+    }
   };
 
   const resetPassword = async (email: string) => {
@@ -148,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, register, logout, resetPassword }}>
+    <AuthContext.Provider value={{ user, profile, loading, isLoggingOut: () => loggingOutRef.current, login, register, logout, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

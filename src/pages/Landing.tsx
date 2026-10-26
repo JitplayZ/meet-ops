@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import {
   Sparkles,
   Calendar,
@@ -19,13 +19,90 @@ export default function Landing() {
     { role: 'assistant', text: "I found 2 available rooms matching your criteria for tomorrow at 2:00 PM: Focus Room 202 (Cap: 8, Whiteboard) and Apollo (Cap: 12, Whiteboard). Would you like to book Focus Room 202?" }
   ]);
 
+  // Interactive demo calendar state
+  const DEMO_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const DEMO_MEETINGS = [
+    { title: 'Board Review', room: 'Boardroom A', type: 'boardroom', floor: 'Executive Wing', day: 'Mon', time: '09:00 - 10:30', status: 'Approved' },
+    { title: 'Team Sync', room: 'Boardroom B', type: 'boardroom', floor: 'HQ - Floor 12', day: 'Mon', time: '11:30 - 13:00', status: 'Approved' },
+    { title: 'Design Huddle', room: 'Huddle 2A', type: 'huddle', floor: 'HQ - Floor 4', day: 'Tue', time: '10:00 - 10:30', status: 'Pending' },
+    { title: '1:1 Check-in', room: 'Huddle 4B', type: 'huddle', floor: 'HQ - Floor 4', day: 'Wed', time: '14:00 - 14:30', status: 'Approved' },
+    { title: 'Sprint Planning', room: 'Boardroom A', type: 'boardroom', floor: 'Executive Wing', day: 'Thu', time: '09:30 - 11:00', status: 'Approved' },
+    { title: 'Standup', room: 'Huddle 2A', type: 'huddle', floor: 'HQ - Floor 4', day: 'Fri', time: '09:00 - 09:15', status: 'Pending' },
+  ];
+  const [demoRoomType, setDemoRoomType] = useState<'all' | 'boardroom' | 'huddle'>('all');
+  const [demoDay, setDemoDay] = useState<string>('');
+
+  const demoFilteredMeetings = DEMO_MEETINGS.filter(
+    m => (demoRoomType === 'all' || m.type === demoRoomType) && (!demoDay || m.day === demoDay),
+  );
+
+  const demoChipStyle = (active: boolean): CSSProperties => ({
+    height: 32,
+    borderRadius: '4px',
+    border: `1px solid ${active ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.08)'}`,
+    background: active ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+    color: active ? 'var(--meetops-purple)' : 'var(--color-on-surface-variant)',
+    fontSize: '11px',
+    fontWeight: active ? 700 : 500,
+    padding: '0 10px',
+    cursor: 'pointer',
+    textAlign: 'left',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'all 0.15s',
+  });
+
+  // Demo rooms the landing-page assistant can suggest (mirrors the seeded
+  // inventory vocabulary so replies feel like the real product).
+  const DEMO_ROOMS = [
+    { name: 'Huddle 4B', capacity: 4, equipment: ['Display', 'Whiteboard'] },
+    { name: 'Focus Room 202', capacity: 8, equipment: ['Display', 'Whiteboard'] },
+    { name: 'Apollo Boardroom', capacity: 12, equipment: ['Display', 'Video Conf', 'Whiteboard'] },
+    { name: 'Executive Boardroom', capacity: 20, equipment: ['Video Conf', 'Display'] },
+  ];
+
+  // Rule-based demo assistant: keeps the request context (capacity, time,
+  // room, intent) and answers with matching room suggestions instead of
+  // pushing visitors to auth.
+  function buildDemoReply(text: string): string {
+    const capMatch = text.match(/(\d+)\s*(people|person|attendees|seats|pax)/i);
+    const capacity = capMatch ? parseInt(capMatch[1]) : null;
+    const timeMatch = text.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i);
+    const when = timeMatch ? timeMatch[1].toUpperCase() : null;
+    const wantsBook = /\b(book|reserve|schedule)\b/i.test(text);
+    const roomMatch = text.match(/\b(room\s*[A-Z0-9]+|boardroom|focus room \d+|apollo|huddle \w+\s*\d*|horizon)\b/i);
+    const context = [capacity ? `for ${capacity} people` : null, when ? `at ${when}` : null].filter(Boolean).join(' ');
+
+    let matches = DEMO_ROOMS.filter(r => !capacity || r.capacity >= capacity);
+    if (roomMatch) {
+      const named = matches.filter(r => r.name.toLowerCase().includes(roomMatch[1].toLowerCase().split(/\s+/)[0]));
+      if (named.length > 0) matches = named;
+    }
+
+    if (matches.length === 0) {
+      return `I couldn't find a demo room matching ${context || 'those criteria'}. Try a smaller group size, or explore the live inventory after signing in.`;
+    }
+
+    const listing = matches
+      .slice(0, 3)
+      .map(r => `• ${r.name} (Cap: ${r.capacity}${r.equipment.length ? `, ${r.equipment.slice(0, 2).join(', ')}` : ''})`)
+      .join('\n');
+
+    if (wantsBook) {
+      const chosen = matches[0];
+      return `✅ Got it — I've prepared your booking request${context ? ` ${context}` : ''}.\n\nMatching rooms:\n${listing}\n\nReserved: ${chosen.name}${when ? ` at ${when}` : ''}. In the live app this goes to your admin for approval.`;
+    }
+
+    return `I found ${matches.length} room option(s)${context ? ` ${context}` : ''}:\n${listing}\n\nWant me to book one of these? Just say "book ${matches[0].name}"${when ? ` at ${when}` : ''}.`;
+  }
+
   const handleDemoSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!demoInput.trim()) return;
     setDemoMessages(prev => [
       ...prev,
       { role: 'user', text: demoInput },
-      { role: 'assistant', text: `Got it! I will process "${demoInput}" for you. Sign up or log in to complete this action and manage actual bookings.` }
+      { role: 'assistant', text: buildDemoReply(demoInput) }
     ]);
     setDemoInput('');
   };
@@ -90,7 +167,7 @@ export default function Landing() {
             <Link to="/login" style={{ fontSize: '0.875rem', color: 'var(--color-on-surface)', textDecoration: 'none', fontWeight: 500 }} className="btn btn-ghost">
               Log In
             </Link>
-            <Link to="/register" className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: 'var(--radius-full)' }}>
+            <Link to="/login" className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: 'var(--radius-full)' }} title="Sign in to start booking – new users can create an account from the sign-in page">
               Get Started
             </Link>
           </div>
@@ -158,7 +235,7 @@ export default function Landing() {
           </p>
 
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 60 }}>
-            <Link to="/register" className="btn btn-primary" style={{ padding: '12px 28px', borderRadius: 'var(--radius-full)', fontSize: '0.9375rem' }}>
+            <Link to="/login" className="btn btn-primary" style={{ padding: '12px 28px', borderRadius: 'var(--radius-full)', fontSize: '0.9375rem' }} title="Sign in to start booking – new users can create an account from the sign-in page">
               Start for free <ArrowRight size={16} />
             </Link>
             <a href="#demo" className="btn btn-secondary" style={{ padding: '12px 28px', borderRadius: 'var(--radius-full)', fontSize: '0.9375rem' }}>
@@ -193,43 +270,100 @@ export default function Landing() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 20 }}>
-              {/* Sidebar filter list mockup */}
-              <div style={{ borderRight: '1px solid var(--color-border-subtle)', paddingRight: 16, display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
-                <div style={{ height: 32, background: 'rgba(255, 255, 255, 0.03)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>HQ - Floor 4</div>
-                <div style={{ height: 32, background: 'rgba(255, 255, 255, 0.03)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>Boardroom (10+)</div>
-                <div style={{ height: 32, background: 'rgba(139, 92, 246, 0.08)', borderRadius: '4px', border: '1px solid rgba(139, 92, 246, 0.2)', display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: '11px', color: 'var(--meetops-purple)' }}>Huddle Room (2-4)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: 20 }}>
+              {/* Interactive demo filter panel */}
+              <div style={{ borderRight: '1px solid var(--color-border-subtle)', paddingRight: 16, display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left' }}>
+                <span className="font-label-caps" style={{ fontSize: '9px', color: 'var(--color-outline)', textTransform: 'uppercase', marginBottom: 2 }}>Room Type</span>
+                <button type="button" aria-pressed={demoRoomType === 'all'} style={demoChipStyle(demoRoomType === 'all')} onClick={() => setDemoRoomType('all')}>
+                  All Rooms
+                </button>
+                <button type="button" aria-pressed={demoRoomType === 'boardroom'} style={demoChipStyle(demoRoomType === 'boardroom')} onClick={() => setDemoRoomType('boardroom')}>
+                  Boardroom (10+)
+                </button>
+                <button type="button" aria-pressed={demoRoomType === 'huddle'} style={demoChipStyle(demoRoomType === 'huddle')} onClick={() => setDemoRoomType('huddle')}>
+                  Huddle Room (2-4)
+                </button>
+                <span className="font-label-caps" style={{ fontSize: '9px', color: 'var(--color-outline)', textTransform: 'uppercase', margin: '10px 0 2px' }}>Day</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  {DEMO_DAYS.map(d => (
+                    <button
+                      key={d}
+                      type="button"
+                      aria-pressed={demoDay === d}
+                      title={d}
+                      style={{ ...demoChipStyle(demoDay === d), padding: 0, justifyContent: 'center', textAlign: 'center' }}
+                      onClick={() => setDemoDay(prev => (prev === d ? '' : d))}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                {(demoRoomType !== 'all' || demoDay) && (
+                  <button
+                    type="button"
+                    style={{ ...demoChipStyle(false), color: 'var(--meetops-purple)', marginTop: 6, justifyContent: 'center' }}
+                    onClick={() => { setDemoRoomType('all'); setDemoDay(''); }}
+                  >
+                    Reset filters
+                  </button>
+                )}
               </div>
 
-              {/* Grid content mock */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, minHeight: 180, position: 'relative' }}>
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.05)', borderRadius: '8px' }} />
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.05)', borderRadius: '8px' }} />
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.05)', borderRadius: '8px' }} />
-                
-                {/* Event overlay card mock */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 24,
-                    left: 24,
-                    right: 48,
-                    height: 80,
-                    background: 'rgba(139, 92, 246, 0.15)',
-                    borderLeft: '4px solid var(--meetops-purple)',
-                    borderRadius: '0 8px 8px 0',
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    backdropFilter: 'blur(8px)',
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-on-surface)' }}>Team Sync - Boardroom A</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-on-surface-variant)', marginTop: 4 }}>11:30 AM - 1:00 PM · Approved</span>
+              {/* Demo meetings list, driven by the filters above */}
+              <div style={{ minHeight: 200, position: 'relative', textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-on-surface-variant)' }}>
+                    {demoFilteredMeetings.length} meeting{demoFilteredMeetings.length === 1 ? '' : 's'}
+                    {demoRoomType !== 'all' ? ` · ${demoRoomType}` : ' · all rooms'}
+                    {demoDay ? ` · ${demoDay}` : ' · all days'}
+                  </span>
                 </div>
+                {demoFilteredMeetings.length === 0 ? (
+                  <div style={{ border: '1px dashed rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '32px 16px', textAlign: 'center', fontSize: '12px', color: 'var(--color-on-surface-variant)' }}>
+                    No meetings match the selected filters.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {demoFilteredMeetings.map(m => (
+                      <div
+                        key={`${m.title}-${m.day}`}
+                        style={{
+                          background: 'rgba(139, 92, 246, 0.10)',
+                          borderLeft: '4px solid var(--meetops-purple)',
+                          borderRadius: '0 8px 8px 0',
+                          padding: '10px 14px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: 12,
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-on-surface)', display: 'block' }}>
+                            {m.title} - {m.room}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-on-surface-variant)' }}>
+                            {m.day} · {m.time} · {m.floor}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            background: m.status === 'Approved' ? 'rgba(137, 206, 255, 0.12)' : 'rgba(255, 184, 105, 0.15)',
+                            color: m.status === 'Approved' ? 'var(--color-secondary)' : 'var(--color-tertiary)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {m.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -371,6 +505,7 @@ export default function Landing() {
                       maxWidth: '85%',
                       textAlign: 'left',
                       lineHeight: 1.4,
+                      whiteSpace: 'pre-line',
                     }}
                   >
                     {msg.text}
@@ -464,7 +599,7 @@ export default function Landing() {
             <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '1.0625rem', maxWidth: 600, margin: '0 auto 36px', lineHeight: 1.6 }}>
               Start managing your office slots today – free to use, easy to set up. Join thousands of teams already using MeetOps.
             </p>
-            <Link to="/register" className="btn btn-secondary" style={{ background: 'white', color: 'var(--meetops-purple)', border: 'none', padding: '14px 32px', fontSize: '1rem', fontWeight: 700, borderRadius: 'var(--radius-full)', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}>
+            <Link to="/login" className="btn btn-secondary" style={{ background: 'white', color: 'var(--meetops-purple)', border: 'none', padding: '14px 32px', fontSize: '1rem', fontWeight: 700, borderRadius: 'var(--radius-full)', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }} title="Sign in to start booking – new users can create an account from the sign-in page">
               Get Started Now <ArrowRight size={16} />
             </Link>
           </div>

@@ -9,7 +9,14 @@ interface Props {
 }
 
 export default function ProtectedRoute({ children, requiredRole }: Props) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, isLoggingOut } = useAuth();
+
+  // During an intentional sign-out the caller (e.g. Sidebar.handleLogout)
+  // is navigating to a public route. Suppress the /login guard redirect so
+  // it doesn't race with that navigation and strand the user on /login.
+  if (isLoggingOut()) {
+    return null;
+  }
 
   if (loading) {
     return (

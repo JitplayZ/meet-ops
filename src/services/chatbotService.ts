@@ -2,8 +2,16 @@ import { supabase } from '@/lib/supabase';
 import { format, parse } from 'date-fns';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-2025' });
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+// Guard against a missing key: GoogleGenerativeAI throws on empty/invalid keys,
+// which would break every chat flow. Intent detection falls back to rules
+// when the model is unavailable.
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+const model = genAI
+  ? genAI.getGenerativeModel({
+      model: import.meta.env.VITE_GEMINI_CHAT_MODEL || 'gemini-2.5-flash',
+    })
+  : null;
 
 export interface ChatMessage {
   id: string;
@@ -110,6 +118,41 @@ function extractDate(text: string): Date | null {
     return new Date(year, month, day);
   }
   
+  // Month-name forms such as "October 26, 2026", "Oct 26", "Nov 3rd",
+  // "26 October 2026". The explicit pattern above only matched numeric
+  // dates, so a natural-language reply to "which date?" was never understood
+  // and the booking flow stalled in the rule-based fallback.
+  const MONTH_INDEX: Record<string, number> = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+  };
+  const MONTH_TOKEN = '(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)';
+  const monthFirst = text.match(new RegExp(`\\b${MONTH_TOKEN}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s*,?\\s*(\\d{2,4}))?\\b`, 'i'));
+  if (monthFirst) {
+    const month = MONTH_INDEX[monthFirst[1].toLowerCase().slice(0, 3)];
+    const day = parseInt(monthFirst[2], 10);
+    let year = monthFirst[3] ? parseInt(monthFirst[3], 10) : now.getFullYear();
+    if (year < 100) year += 2000;
+    const d = new Date(year, month, day, 0, 0, 0, 0);
+    // No explicit year and already past -> assume they meant next occurrence.
+    if (!monthFirst[3] && d.getTime() < now.getTime() - 24 * 60 * 60 * 1000) {
+      d.setFullYear(d.getFullYear() + 1);
+    }
+    if (!isNaN(d.getTime())) return d;
+  }
+  const dayFirst = text.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${MONTH_TOKEN}\\.?(?:\\s*,?\\s*(\\d{2,4}))?\\b`, 'i'));
+  if (dayFirst) {
+    const month = MONTH_INDEX[dayFirst[2].toLowerCase().slice(0, 3)];
+    const day = parseInt(dayFirst[1], 10);
+    let year = dayFirst[3] ? parseInt(dayFirst[3], 10) : now.getFullYear();
+    if (year < 100) year += 2000;
+    const d = new Date(year, month, day, 0, 0, 0, 0);
+    if (!dayFirst[3] && d.getTime() < now.getTime() - 24 * 60 * 60 * 1000) {
+      d.setFullYear(d.getFullYear() + 1);
+    }
+    if (!isNaN(d.getTime())) return d;
+  }
+  
   return null;
 }
 
@@ -148,7 +191,12 @@ function extractRoomName(text: string): string | null {
 function detectIntent(text: string): BookingIntent {
   const lowerText = text.toLowerCase();
   
-  if (lowerText.includes('book') || lowerText.includes('reserve') || lowerText.includes('schedule') || lowerText.includes('create')) {
+  // "Show my bookings" / "my upcoming meetings" contains the substring "book"/
+  // "schedule" but is a VIEW request, not a new booking. Guard so these fall
+  // through to the show_bookings branches below instead of starting a booking.
+  const isViewingBookings = /(my bookings?|show (me )?(my )?bookings?|list (my )?bookings?|upcoming bookings?|my upcoming|my schedule|my meetings?)/i.test(lowerText);
+
+  if (!isViewingBookings && (lowerText.includes('book') || lowerText.includes('reserve') || lowerText.includes('schedule') || lowerText.includes('create'))) {
     return {
       action: 'book_room',
       entities: {
@@ -387,6 +435,108 @@ async function createBooking(userId: string, userName: string, roomId: string, r
   return result.id;
 }
 
+// The rule-based fallback assistant is otherwise stateless: it could start a
+// booking but lost the room/purpose as soon as it asked a follow-up ("Which
+// date?"), so a bare "October 26, 2026" reply was never understood and the flow
+// stalled. This per-user store lets a booking span multiple turns.
+interface PendingBooking {
+  roomId?: string;
+  roomName?: string;
+  date?: Date;
+  startTime?: string;
+  purpose?: string;
+}
+const pendingBookings = new Map<string, PendingBooking>();
+
+// Resolve a room by (partial) name. Some rooms share the same name in the
+// inventory, so `.single()` would error out on ambiguous names; pick the
+// earliest-created match deterministically instead.
+async function resolveRoomByName(name: string) {
+  const { data } = await supabase
+    .from('rooms')
+    .select('id, name')
+    .ilike('name', `%${name}%`)
+    .order('created_at', { ascending: true })
+    .limit(1);
+  return data?.[0] || null;
+}
+
+// Match the *full* room name actually mentioned in the free text. `extractRoomName`
+// keys on the literal word "Room", so "book E2E Test Room A" collapses to just
+// "A" and a partial ILIKE then resolves to an unrelated room (e.g. "Boardroom
+// 305"). Comparing against the real inventory and preferring the longest
+// (most specific) matching name books the room the user actually named.
+async function findRoomByMention(text: string) {
+  const { data: rooms } = await supabase
+    .from('rooms')
+    .select('id, name')
+    .order('created_at', { ascending: true });
+  if (!rooms || rooms.length === 0) return null;
+  const lower = text.toLowerCase();
+  const matched = rooms
+    .filter(r => r.name && lower.includes(r.name.toLowerCase()))
+    .sort((a, b) => b.name.length - a.name.length);
+  return matched[0] || null;
+}
+
+// Resolve the room referenced by a user message: first by an exact known room
+// name contained in the text, then by the regex-extracted/partial name.
+async function resolveRoomFromText(text: string, fallbackName?: string) {
+  const direct = await findRoomByMention(text);
+  if (direct) return direct;
+  const name = fallbackName || extractRoomName(text);
+  if (name) return await resolveRoomByName(name);
+  return null;
+}
+
+// Drive the booking conversation: ask for the next missing detail (persisting
+// partial state) or, once room + date + start time are known, complete it.
+async function advanceBooking(
+  userId: string,
+  userName: string | undefined,
+  pending: PendingBooking,
+): Promise<{ response: string; metadata?: any }> {
+  if (!pending.roomId) {
+    pendingBookings.set(userId, pending);
+    return { response: 'Which room would you like to book? You can give me the room name, or ask me to find an available one.' };
+  }
+  if (!pending.date) {
+    pendingBookings.set(userId, pending);
+    return { response: `Which date would you like to book ${pending.roomName} for? (e.g. "October 26, 2026", "tomorrow", "next Friday")` };
+  }
+  if (!pending.startTime) {
+    pendingBookings.set(userId, pending);
+    return { response: `What time should your ${pending.roomName} meeting on ${format(pending.date, 'MMMM d, yyyy')} start? (e.g. "2 PM", "14:00")` };
+  }
+
+  const endTime = new Date(`${format(pending.date, 'yyyy-MM-dd')}T${pending.startTime}`);
+  endTime.setHours(endTime.getHours() + 1);
+  const endTimeStr = format(endTime, 'HH:mm');
+
+  try {
+    await createBooking(
+      userId,
+      userName || 'User',
+      pending.roomId,
+      pending.roomName || '',
+      pending.date,
+      pending.startTime,
+      endTimeStr,
+      pending.purpose,
+    );
+    pendingBookings.delete(userId);
+    return {
+      response: `✅ Meeting booked successfully!\n\n**Room:** ${pending.roomName}\n**Date:** ${format(pending.date, 'EEEE, MMMM d, yyyy')}\n**Time:** ${pending.startTime} - ${endTimeStr}\n**Status:** Pending approval\n\nYour booking request has been submitted for approval.`,
+      metadata: { success: true, roomId: pending.roomId, roomName: pending.roomName },
+    };
+  } catch (err: any) {
+    pendingBookings.delete(userId);
+    return {
+      response: `Sorry, I couldn't book the room: ${err.message || 'Unknown error'}. The room might already be booked at that time.`,
+    };
+  }
+}
+
 function formatFieldName(field: string): string {
   const fieldNames: Record<string, string> = {
     date: 'Date',
@@ -404,9 +554,35 @@ export async function processChatMessage(
   userId?: string,
   userName?: string,
 ): Promise<{ response: string; metadata?: any }> {
+  // Resume an in-progress booking before doing fresh intent detection, so a
+  // short answer like "October 26, 2026" or "2 PM" is interpreted in context
+  // instead of falling through to "I'm not sure I understood".
+  if (userId) {
+    const pending = pendingBookings.get(userId);
+    if (pending) {
+      if (/\b(cancel|never ?mind|stop|forget it|quit|start over)\b/i.test(message)) {
+        pendingBookings.delete(userId);
+        return { response: "No problem — I've cancelled that booking request. What else can I help you with?" };
+      }
+      const d = extractDate(message);
+      const t = extractTime(message);
+      const purpose = extractPurpose(message);
+      if (d) pending.date = d;
+      if (t) pending.startTime = t;
+      if (purpose) pending.purpose = purpose;
+      // Only override the room when this message actually names one (matched
+      // against the real inventory), so a bare "October 29, 2026" reply keeps
+      // the room chosen on an earlier turn.
+      const room = await resolveRoomFromText(message);
+      if (room) { pending.roomId = room.id; pending.roomName = room.name; }
+      return await advanceBooking(userId, userName, pending);
+    }
+  }
+
   let intent: BookingIntent;
   
   try {
+    if (!model) throw new Error('Gemini model not configured');
     const geminiResponse = await model.generateContent(
       `You are an AI Meeting Booking Assistant for MeetOps. Help users find rooms, check availability, book meetings, and view their bookings.
       
@@ -522,13 +698,9 @@ If the user is asking to book but hasn't provided date/time/room, set needsMoreI
           };
         }
         
-        const { data: room, error } = await supabase
-          .from('rooms')
-          .select('*')
-          .ilike('name', `%${intent.entities.roomName}%`)
-          .single();
+        const room = await resolveRoomFromText(message, intent.entities.roomName);
         
-        if (error || !room) {
+        if (!room) {
           return { response: `I couldn't find a room named "${intent.entities.roomName}". Please check the room name and try again.` };
         }
         
@@ -557,63 +729,30 @@ If the user is asking to book but hasn't provided date/time/room, set needsMoreI
           return { response: 'Please log in to book a room.' };
         }
         
-        if (!intent.entities.date) {
-          return { response: 'Which date would you like to book the room for? Please specify a date (e.g., "tomorrow", "Monday", "Dec 15").' };
-        }
-        
-        if (!intent.entities.startTime) {
-          return { response: 'What time would you like to start the meeting? (e.g., "2 PM", "14:00")' };
-        }
-        
-        let roomId = '';
-        let roomName = '';
-        
-        if (intent.entities.roomName) {
-          const { data: room } = await supabase
-            .from('rooms')
-            .select('id, name')
-            .ilike('name', `%${intent.entities.roomName}%`)
-            .single();
-          
-          if (!room) {
-            return { response: `I couldn't find a room named "${intent.entities.roomName}". Would you like me to find available rooms instead?` };
-          }
-          roomId = room.id;
-          roomName = room.name;
+        // Collect what we have and hand off to advanceBooking, which either
+        // asks for the next missing detail (remembering state so the follow-up
+        // answer is understood) or completes the booking. Resolve the room from
+        // the actual message so a full room name mentioned by the user wins over
+        // the regex-truncated fragment.
+        const pending: PendingBooking = { purpose: intent.entities.purpose };
+        const room = await resolveRoomFromText(message, intent.entities.roomName);
+        if (room) {
+          pending.roomId = room.id;
+          pending.roomName = room.name;
+        } else if (intent.entities.roomName) {
+          return { response: `I couldn't find a room named "${intent.entities.roomName}". Would you like me to find available rooms instead?` };
         } else {
           const rooms = await findRooms({ capacity: intent.entities.capacity });
           if (rooms.length === 0) {
             return { response: "I couldn't find any available rooms. Please try different criteria." };
           }
-          roomId = rooms[0].id;
-          roomName = rooms[0].name;
+          pending.roomId = rooms[0].id;
+          pending.roomName = rooms[0].name;
         }
+        if (intent.entities.date) pending.date = intent.entities.date;
+        if (intent.entities.startTime) pending.startTime = intent.entities.startTime;
         
-        const endTime = new Date(`${format(intent.entities.date, 'yyyy-MM-dd')}T${intent.entities.startTime}`);
-        endTime.setHours(endTime.getHours() + 1);
-        const endTimeStr = format(endTime, 'HH:mm');
-        
-        try {
-          await createBooking(
-            userId,
-            userName,
-            roomId,
-            roomName,
-            intent.entities.date,
-            intent.entities.startTime,
-            endTimeStr,
-            intent.entities.purpose,
-          );
-          
-          return {
-            response: `✅ Meeting booked successfully!\n\n**Room:** ${roomName}\n**Date:** ${format(intent.entities.date, 'EEEE, MMMM d')}\n**Time:** ${intent.entities.startTime} - ${endTimeStr}\n**Status:** Pending approval\n\nYour booking request has been submitted for approval.`,
-            metadata: { success: true, roomId, roomName },
-          };
-        } catch (err: any) {
-          return {
-            response: `Sorry, I couldn't book the room: ${err.message || 'Unknown error'}. The room might already be booked at that time.`,
-          };
-        }
+        return await advanceBooking(userId, userName, pending);
       }
       
       case 'show_bookings': {
